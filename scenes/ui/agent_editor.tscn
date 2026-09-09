@@ -38,128 +38,139 @@ color = Color(0, 0, 0, 0.65)
 
 [node name="Dialog" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -320.0
-offset_right = 300.0
-offset_bottom = 320.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -64.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("sb_dialog")
 
-[node name="Form" type="VBoxContainer" parent="Dialog"]
+[node name="Scroll" type="ScrollContainer" parent="Dialog"]
 layout_mode = 2
+size_flags_vertical = 3
 
-[node name="Title" type="Label" parent="Dialog/Form"]
+[node name="Form" type="VBoxContainer" parent="Dialog/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Title" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Agent Editor"
 
-[node name="NameLabel" type="Label" parent="Dialog/Form"]
+[node name="NameLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "Name"
 
-[node name="NameEdit" type="LineEdit" parent="Dialog/Form"]
+[node name="NameEdit" type="LineEdit" parent="Dialog/Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Godot Coder"
 
-[node name="ModelLabel" type="Label" parent="Dialog/Form"]
+[node name="ModelLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "Model (provider/model)"
 
-[node name="ModelRow" type="HBoxContainer" parent="Dialog/Form"]
+[node name="ModelRow" type="HBoxContainer" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 
-[node name="ModelSelect" type="OptionButton" parent="Dialog/Form/ModelRow"]
+[node name="ModelSelect" type="OptionButton" parent="Dialog/Scroll/Form/ModelRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ModelRefreshButton" type="Button" parent="Dialog/Form/ModelRow"]
+[node name="ModelRefreshButton" type="Button" parent="Dialog/Scroll/Form/ModelRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Refresh"
 
-[node name="ModelCustomEdit" type="LineEdit" parent="Dialog/Form"]
+[node name="ModelCustomEdit" type="LineEdit" parent="Dialog/Scroll/Form"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 placeholder_text = "provider/model custom..."
 
-[node name="OpenCodeAgentLabel" type="Label" parent="Dialog/Form"]
+[node name="OpenCodeAgentLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "OpenCode agent (optional)"
 
-[node name="OpenCodeAgentEdit" type="LineEdit" parent="Dialog/Form"]
+[node name="OpenCodeAgentEdit" type="LineEdit" parent="Dialog/Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "e.g. build"
 
-[node name="PersonalityLabel" type="Label" parent="Dialog/Form"]
+[node name="PersonalityLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "Personality / System Prompt"
 
-[node name="PersonalityEdit" type="TextEdit" parent="Dialog/Form"]
+[node name="PersonalityEdit" type="TextEdit" parent="Dialog/Scroll/Form"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
+custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
-size_flags_vertical = 3
 
-[node name="SkillsLabel" type="Label" parent="Dialog/Form"]
+[node name="SkillsLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "Skills"
 
-[node name="SkillsBox" type="VBoxContainer" parent="Dialog/Form"]
+[node name="SkillsBox" type="VBoxContainer" parent="Dialog/Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="SkillAddRow" type="HBoxContainer" parent="Dialog/Form"]
+[node name="SkillAddRow" type="HBoxContainer" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 
-[node name="SkillInput" type="LineEdit" parent="Dialog/Form/SkillAddRow"]
+[node name="SkillSelect" type="OptionButton" parent="Dialog/Scroll/Form/SkillAddRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="SkillInput" type="LineEdit" parent="Dialog/Scroll/Form/SkillAddRow"]
+unique_name_in_owner = true
+layout_mode = 2
 placeholder_text = "skill name..."
 
-[node name="AddSkillButton" type="Button" parent="Dialog/Form/SkillAddRow"]
+[node name="SkillRefreshButton" type="Button" parent="Dialog/Scroll/Form/SkillAddRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Refresh"
+
+[node name="AddSkillButton" type="Button" parent="Dialog/Scroll/Form/SkillAddRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Add"
 
-[node name="CharacterRow" type="HBoxContainer" parent="Dialog/Form"]
+[node name="CharacterRow" type="HBoxContainer" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 
-[node name="CharacterLabel" type="Label" parent="Dialog/Form/CharacterRow"]
+[node name="CharacterLabel" type="Label" parent="Dialog/Scroll/Form/CharacterRow"]
 layout_mode = 2
 text = "Character"
 
-[node name="CharacterPreview" type="TextureRect" parent="Dialog/Form/CharacterRow"]
+[node name="CharacterPreview" type="TextureRect" parent="Dialog/Scroll/Form/CharacterRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 6
 
-[node name="CharacterButton" type="Button" parent="Dialog/Form/CharacterRow"]
+[node name="CharacterButton" type="Button" parent="Dialog/Scroll/Form/CharacterRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Select Image..."
 
-[node name="ProjectRow" type="HBoxContainer" parent="Dialog/Form"]
+[node name="ProjectRow" type="HBoxContainer" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 
-[node name="ProjectLabel2" type="Label" parent="Dialog/Form/ProjectRow"]
+[node name="ProjectLabel2" type="Label" parent="Dialog/Scroll/Form/ProjectRow"]
 layout_mode = 2
 text = "Project"
 
-[node name="ProjectLabel" type="Label" parent="Dialog/Form/ProjectRow"]
+[node name="ProjectLabel" type="Label" parent="Dialog/Scroll/Form/ProjectRow"]
 unique_name_in_owner = true
 layout_mode = 2
 modulate = Color(0.7, 0.7, 0.75, 1)
@@ -167,21 +178,49 @@ text = "--"
 size_flags_horizontal = 3
 text_overrun_behavior = 3
 
-[node name="ProjectButton" type="Button" parent="Dialog/Form/ProjectRow"]
+[node name="ProjectButton" type="Button" parent="Dialog/Scroll/Form/ProjectRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Select..."
 
-[node name="Actions" type="HBoxContainer" parent="Dialog/Form"]
+[node name="AnimationsLabel" type="Label" parent="Dialog/Scroll/Form"]
+layout_mode = 2
+text = "Animations per State (frames 256x256)"
+
+[node name="AnimScroll" type="ScrollContainer" parent="Dialog/Scroll/Form"]
+custom_minimum_size = Vector2(0, 170)
+layout_mode = 2
+
+[node name="AnimBox" type="VBoxContainer" parent="Dialog/Scroll/Form/AnimScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ActionsBar" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -64.0
+offset_right = -24.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("sb_dialog")
+
+[node name="Actions" type="HBoxContainer" parent="ActionsBar"]
 layout_mode = 2
 alignment = 2
+theme_override_constants/separation = 8
 
-[node name="CancelButton" type="Button" parent="Dialog/Form/Actions"]
+[node name="CancelButton" type="Button" parent="ActionsBar/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Cancel"
 
-[node name="SaveButton" type="Button" parent="Dialog/Form/Actions"]
+[node name="SaveButton" type="Button" parent="ActionsBar/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Save"
@@ -198,3 +237,9 @@ unique_name_in_owner = true
 file_mode = 1
 access = 2
 title = "Select Project Folder"
+
+[node name="AnimDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+file_mode = 1
+access = 2
+title = "Select Animation Frames Folder"

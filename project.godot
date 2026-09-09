@@ -20,6 +20,7 @@ run/main_scene="res://scenes/main/main.tscn"
 EventBus="*res://scripts/autoload/event_bus.gd"
 ProfileStore="*res://scripts/autoload/profile_store.gd"
 ModelCatalog="*res://scripts/autoload/model_catalog.gd"
+SkillCatalog="*res://scripts/autoload/skill_catalog.gd"
 AgentManager="*res://scripts/autoload/agent_manager.gd"
 
 [display]

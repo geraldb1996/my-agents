@@ -18,12 +18,7 @@ func refresh() -> void:
 	if err != OK:
 		push_warning("opencode models failed with error %d" % err)
 		return
-	for raw in output:
-		var m := str(raw).strip_edges()
-		if m.is_empty() or m.find("/") == -1:
-			continue
-		models.append(m)
-	models.sort()
+	_collect_models(output)
 	loaded_once = true
 	models_loaded.emit()
 
@@ -38,11 +33,16 @@ func refresh_with_network() -> void:
 	models.clear()
 	if err != OK:
 		return
-	for raw in output:
-		var m := str(raw).strip_edges()
-		if m.is_empty() or m.find("/") == -1:
-			continue
-		models.append(m)
-	models.sort()
+	_collect_models(output)
 	loaded_once = true
 	models_loaded.emit()
+
+
+func _collect_models(output: Array) -> void:
+	for raw in output:
+		for part in str(raw).split("\n"):
+			var m := part.strip_edges()
+			if m.is_empty() or m.find("/") == -1:
+				continue
+			models.append(m)
+	models.sort()

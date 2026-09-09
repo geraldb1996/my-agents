@@ -41,7 +41,7 @@ const FALLBACKS := {
 	"question": "approval",
 }
 
-const BASE_TEXTURE := "res://images/agent1/agent.png"
+const BASE_TEXTURE := "res://images/agents/agent.png"
 
 @onready var avatar: TextureRect = %Avatar
 @onready var state_label: Label = %StateLabel
@@ -145,6 +145,20 @@ func _prepare_custom_frames() -> void:
 					list.append(tex)
 			if not list.is_empty():
 				_frames[state] = list
+		elif spec.has("folder"):
+			var folder := str(spec["folder"])
+			var dir := DirAccess.open(folder)
+			if dir != null:
+				var list3: Array[Texture2D] = []
+				var files := dir.get_files()
+				files.sort()
+				for f in files:
+					if f.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+						var tex := _load_texture(folder.path_join(f))
+						if tex != null:
+							list3.append(tex)
+				if not list3.is_empty():
+					_frames[state] = list3
 		elif spec.has("sheet"):
 			var sheet := _load_texture(str(spec["sheet"]))
 			if sheet != null:

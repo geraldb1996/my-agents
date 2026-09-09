@@ -8,14 +8,19 @@ extends Control
 @onready var personality_edit: TextEdit = %PersonalityEdit
 @onready var skills_box: VBoxContainer = %SkillsBox
 @onready var skill_input: LineEdit = %SkillInput
+@onready var skill_select: OptionButton = %SkillSelect
+@onready var anim_box: VBoxContainer = %AnimBox
+@onready var anim_dialog: FileDialog = %AnimDialog
 @onready var character_preview: TextureRect = %CharacterPreview
 @onready var character_dialog: FileDialog = %CharacterDialog
 @onready var project_label: Label = %ProjectLabel
 @onready var project_dialog: FileDialog = %ProjectDialog
 
 var _editing_id: String = ""
-var _character_path: String = "res://images/agent1/agent.png"
+var _character_path: String = AgentProfile.DEFAULT_CHARACTER
 var _project_path: String = ""
+var _animations: Dictionary = {}
+var _anim_dialog_state: String = ""
 
 
 func _ready() -> void:
@@ -29,12 +34,15 @@ func _ready() -> void:
 	%ModelRefreshButton.pressed.connect(_on_refresh_models_pressed)
 	model_select.item_selected.connect(_on_model_item_selected)
 	ModelCatalog.models_loaded.connect(_on_models_loaded)
+	%SkillRefreshButton.pressed.connect(_on_refresh_skills_pressed)
+	skill_select.item_selected.connect(_on_skill_item_selected)
+	SkillCatalog.skills_loaded.connect(_on_skills_loaded)
+	anim_dialog.dir_selected.connect(_on_anim_folder_selected)
 
 
 func open_new() -> void:
 	_editing_id = ""
 	_populate_defaults()
-	_ensure_catalog()
 
 
 func open_profile(profile: AgentProfile) -> void:
@@ -42,12 +50,14 @@ func open_profile(profile: AgentProfile) -> void:
 	name_edit.text = profile.name
 	opencode_agent_edit.text = profile.opencode_agent
 	personality_edit.text = profile.personality
-	_character_path = profile.character if not profile.character.is_empty() else "res://images/agent1/agent.png"
+	_character_path = profile.character if not profile.character.is_empty() else AgentProfile.DEFAULT_CHARACTER
 	_project_path = profile.project
 	_refresh_skills(profile.skills)
+	_animations = profile.animations.duplicate(true)
+	_refresh_animation_rows()
 	_update_character_preview()
 	_update_project_label()
-	_ensure_catalog()
+	_ensure_catalogs()
 	_select_model(profile.model)
 	visible = true
 
@@ -56,21 +66,26 @@ func _populate_defaults() -> void:
 	name_edit.text = ""
 	opencode_agent_edit.text = ""
 	personality_edit.text = ""
-	_character_path = "res://images/agent1/agent.png"
+	_character_path = AgentProfile.DEFAULT_CHARACTER
 	_project_path = ""
 	_refresh_skills([])
+	_animations = {}
+	_refresh_animation_rows()
 	_update_character_preview()
 	_update_project_label()
 	_select_model("")
 	model_custom_edit.text = ""
 	model_custom_edit.visible = false
+	_ensure_catalogs()
 	visible = true
 	name_edit.grab_focus()
 
 
-func _ensure_catalog() -> void:
+func _ensure_catalogs() -> void:
 	if ModelCatalog.models.is_empty() and not ModelCatalog.loaded_once:
 		ModelCatalog.refresh()
+	if SkillCatalog.skills.is_empty() and not SkillCatalog.loaded_once:
+		SkillCatalog.refresh()
 
 
 func _on_models_loaded() -> void:
@@ -93,6 +108,8 @@ func _populate_model_items() -> void:
 
 func _select_model(model: String) -> void:
 	model_custom_edit.text = model
+	if model_select.item_count == 0:
+		return
 	if model.is_empty():
 		model_select.select(0)
 		model_custom_edit.visible = false
@@ -151,12 +168,46 @@ func _add_skill_row(skill: String) -> void:
 
 
 func _on_add_skill_pressed() -> void:
-	var skill := skill_input.text.strip_edges()
+	var skill := _get_selected_skill()
 	if skill.is_empty():
 		return
 	_add_skill_row(skill)
 	skill_input.clear()
-	skill_input.grab_focus()
+
+
+func _get_selected_skill() -> String:
+	if skill_select.selected <= 0:
+		return skill_input.text.strip_edges()
+	var custom_idx := SkillCatalog.skills.size() + 1
+	if skill_select.selected == custom_idx:
+		return skill_input.text.strip_edges()
+	return skill_select.get_item_text(skill_select.selected)
+
+
+func _on_skill_item_selected(index: int) -> void:
+	var custom_idx := SkillCatalog.skills.size() + 1
+	if index == custom_idx:
+		skill_input.visible = true
+		skill_input.grab_focus()
+		return
+	if index > 0:
+		_add_skill_row(skill_select.get_item_text(index))
+		skill_select.select(0)
+
+
+func _on_refresh_skills_pressed() -> void:
+	SkillCatalog.refresh()
+
+
+func _on_skills_loaded() -> void:
+	var previous := skill_select.selected
+	skill_select.clear()
+	skill_select.add_item("Pick a skill...", 0)
+	for s in SkillCatalog.skills:
+		skill_select.add_item(s)
+	skill_select.add_item("Custom...", -1)
+	if previous > 0:
+		skill_select.select(previous)
 
 
 func _collect_skills() -> Array[String]:
@@ -169,6 +220,96 @@ func _collect_skills() -> Array[String]:
 				if not text.is_empty() and not skills.has(text):
 					skills.append(text)
 	return skills
+
+
+func _refresh_animation_rows() -> void:
+	for child in anim_box.get_children():
+		child.queue_free()
+	for state in AgentProfile.ANIMATION_STATES:
+		anim_box.add_child(_build_anim_row(state))
+
+
+func _build_anim_row(state: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 30)
+
+	var state_label := Label.new()
+	state_label.text = state
+	state_label.custom_minimum_size = Vector2(90, 0)
+	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(state_label)
+
+	var fps := SpinBox.new()
+	fps.name = "Fps"
+	fps.min_value = 1.0
+	fps.max_value = 30.0
+	fps.value = 8.0
+	fps.custom_minimum_size = Vector2(52, 0)
+	fps.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	fps.value_changed.connect(_on_anim_fps_changed.bind(state))
+	row.add_child(fps)
+
+	var path_label := Label.new()
+	path_label.name = "PathLabel"
+	path_label.text = "placeholder"
+	path_label.modulate = Color(0.6, 0.6, 0.65)
+	path_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	path_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	row.add_child(path_label)
+
+	var set_button := Button.new()
+	set_button.name = "SetButton"
+	set_button.text = "Set..."
+	set_button.custom_minimum_size = Vector2(64, 0)
+	set_button.pressed.connect(_on_anim_set_pressed.bind(state))
+	row.add_child(set_button)
+
+	var clear_button := Button.new()
+	clear_button.name = "ClearButton"
+	clear_button.text = "x"
+	clear_button.custom_minimum_size = Vector2(28, 0)
+	clear_button.pressed.connect(_on_anim_clear_pressed.bind(state))
+	row.add_child(clear_button)
+
+	if _animations.has(state):
+		var spec: Dictionary = _animations[state]
+		if spec.has("folder"):
+			path_label.text = str(spec["folder"])
+			fps.value = float(spec.get("fps", 8.0))
+		elif spec.has("frames"):
+			path_label.text = "%d frames" % (spec["frames"] as Array).size()
+			fps.value = float(spec.get("fps", 8.0))
+		elif spec.has("sheet"):
+			path_label.text = str(spec["sheet"])
+			fps.value = float(spec.get("fps", 8.0))
+	return row
+
+
+func _on_anim_set_pressed(state: String) -> void:
+	_anim_dialog_state = state
+	anim_dialog.popup_centered_ratio(0.5)
+
+
+func _on_anim_clear_pressed(state: String) -> void:
+	_animations.erase(state)
+	_refresh_animation_rows()
+
+
+func _on_anim_fps_changed(value: float, state: String) -> void:
+	if not _animations.has(state):
+		return
+	var spec: Dictionary = _animations[state]
+	spec["fps"] = value
+	_animations[state] = spec
+
+
+func _on_anim_folder_selected(path: String) -> void:
+	var state := _anim_dialog_state
+	if state.is_empty():
+		return
+	_animations[state] = {"folder": path, "fps": 8.0}
+	_refresh_animation_rows()
 
 
 func _on_character_selected(path: String) -> void:
@@ -211,6 +352,7 @@ func _on_save_pressed() -> void:
 		profile.skills = _collect_skills()
 		profile.character = _character_path
 		profile.project = _project_path
+		profile.animations = _animations.duplicate(true)
 	else:
 		profile = AgentProfile.new()
 		profile.ensure_id()
@@ -221,6 +363,7 @@ func _on_save_pressed() -> void:
 		profile.skills = _collect_skills()
 		profile.character = _character_path
 		profile.project = _project_path
+		profile.animations = _animations.duplicate(true)
 		profile.created_at = Time.get_unix_time_from_system()
 	ProfileStore.save_profile(profile)
 	EventBus.profile_saved.emit(profile)
