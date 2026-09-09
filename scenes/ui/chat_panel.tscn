@@ -36,12 +36,27 @@ theme_override_font_sizes/font_size = 18
 text = "TEAM CHAT"
 size_flags_horizontal = 3
 
-[node name="Scroll" type="ScrollContainer" parent="Root"]
+[node name="ClearButton" type="Button" parent="Root/Header"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 3
+text = "Clear All"
 
-[node name="MessagesBox" type="VBoxContainer" parent="Root/Scroll"]
+[node name="ChatScrollArea" type="Control" parent="Root"]
+layout_mode = 2
+size_flags_vertical = 3
+clip_contents = true
+
+[node name="Scroll" type="ScrollContainer" parent="Root/ChatScrollArea"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+
+[node name="MessagesBox" type="VBoxContainer" parent="Root/ChatScrollArea/Scroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -66,3 +81,8 @@ placeholder_text = "Message... use @Agent or @all"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Send"
+
+[node name="ClearDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "Clear chat history"
+dialog_text = "Delete all chat messages? This cannot be undone."

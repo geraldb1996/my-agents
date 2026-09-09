@@ -83,6 +83,11 @@ func append_chat_message(sender: String, content: String, mentions: Array, times
 	_write_text(CHAT_PATH, JSON.stringify(chat_history, "\t"))
 
 
+func clear_chat_history() -> void:
+	chat_history.clear()
+	_write_text(CHAT_PATH, "[]")
+
+
 func load_session(agent_id: String) -> Dictionary:
 	var path := SESSIONS_DIR.path_join(agent_id + ".json")
 	var text := _read_text(path)

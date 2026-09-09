@@ -1,7 +1,7 @@
 class_name WorkspacePanel
 extends PanelContainer
 
-@onready var project_label: Label = %ProjectLabel
+@onready var project_path_edit: LineEdit = %ProjectPathEdit
 @onready var task_edit: LineEdit = %TaskEdit
 @onready var start_stop_button: Button = %StartStopButton
 @onready var state_label: Label = %StateLabel
@@ -22,6 +22,7 @@ func _ready() -> void:
 	%StartStopButton.pressed.connect(_on_start_stop_pressed)
 	%TempSkillButton.pressed.connect(_on_temp_skill_pressed)
 	project_dialog.dir_selected.connect(_on_project_selected)
+	project_path_edit.text_submitted.connect(_on_project_path_submitted)
 	EventBus.agent_selected.connect(_on_agent_selected)
 	EventBus.agent_state_changed.connect(_on_state_changed)
 	EventBus.agent_output.connect(_on_output)
@@ -34,7 +35,7 @@ func _ready() -> void:
 func clear() -> void:
 	_current_id = ""
 	agent_name_label.text = "No agent selected"
-	project_label.text = "--"
+	project_path_edit.text = ""
 	state_label.text = "--"
 	git_label.text = "--"
 	files_label.text = "--"
@@ -51,8 +52,8 @@ func clear() -> void:
 func _on_agent_selected(profile: AgentProfile) -> void:
 	_current_id = profile.id
 	agent_name_label.text = profile.name
-	project_label.text = profile.project if not profile.project.is_empty() else "--"
-	project_label.tooltip_text = profile.project
+	project_path_edit.text = profile.project
+	project_path_edit.tooltip_text = profile.project
 	character_view.set_profile(profile)
 	start_stop_button.disabled = false
 	%SelectProjectButton.disabled = false
@@ -116,7 +117,7 @@ func _on_send_pressed() -> void:
 	var task := task_edit.text.strip_edges()
 	if task.is_empty():
 		return
-	if AgentManager.send_task(_current_id, task):
+	if AgentManager.send_task(_current_id, task) == AgentManager.TASK_OK:
 		task_edit.clear()
 
 
@@ -137,18 +138,40 @@ func _on_select_project_pressed() -> void:
 
 
 func _on_project_selected(path: String) -> void:
+	project_path_edit.text = path
+	_apply_project(path)
+
+
+func _on_project_path_submitted(text: String) -> void:
+	_apply_project(text.strip_edges())
+
+
+func _apply_project(path: String) -> void:
 	if _current_id.is_empty():
 		return
 	var profile := ProfileStore.get_profile(_current_id)
 	if profile == null:
 		return
+	if not path.is_empty() and not _is_valid_dir(path):
+		EventBus.agent_output.emit(_current_id, "[error] Invalid folder path: %s" % path)
+		project_path_edit.text = profile.project
+		return
 	profile.project = path
 	ProfileStore.save_profile(profile)
-	project_label.text = path
-	project_label.tooltip_text = path
-	%SendButton.disabled = false
+	project_path_edit.text = path
+	project_path_edit.tooltip_text = path
+	%SendButton.disabled = path.is_empty()
 	AgentManager.queue_git_refresh(_current_id, 0.3)
 	EventBus.agent_output.emit(_current_id, "[project] set to %s" % path)
+
+
+func _is_valid_dir(path: String) -> bool:
+	var expanded := path
+	if path.begins_with("~"):
+		expanded = OS.get_environment("HOME").path_join(path.substr(1).trim_prefix("/"))
+	if expanded.begins_with("res://"):
+		return true
+	return DirAccess.dir_exists_absolute(expanded)
 
 
 func _on_temp_skill_pressed() -> void:

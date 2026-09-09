@@ -13,8 +13,10 @@ extends Control
 @onready var anim_dialog: FileDialog = %AnimDialog
 @onready var character_preview: TextureRect = %CharacterPreview
 @onready var character_dialog: FileDialog = %CharacterDialog
-@onready var project_label: Label = %ProjectLabel
+@onready var project_path_edit: LineEdit = %ProjectPathEdit
 @onready var project_dialog: FileDialog = %ProjectDialog
+
+const FPS_OPTIONS := [4, 6, 8, 10, 12, 15, 24, 30]
 
 var _editing_id: String = ""
 var _character_path: String = AgentProfile.DEFAULT_CHARACTER
@@ -31,6 +33,7 @@ func _ready() -> void:
 	%ProjectButton.pressed.connect(func(): project_dialog.popup_centered_ratio(0.5))
 	character_dialog.file_selected.connect(_on_character_selected)
 	project_dialog.dir_selected.connect(_on_project_selected)
+	project_path_edit.text_submitted.connect(_on_project_path_submitted)
 	%ModelRefreshButton.pressed.connect(_on_refresh_models_pressed)
 	model_select.item_selected.connect(_on_model_item_selected)
 	ModelCatalog.models_loaded.connect(_on_models_loaded)
@@ -38,6 +41,7 @@ func _ready() -> void:
 	skill_select.item_selected.connect(_on_skill_item_selected)
 	SkillCatalog.skills_loaded.connect(_on_skills_loaded)
 	anim_dialog.dir_selected.connect(_on_anim_folder_selected)
+	anim_dialog.files_selected.connect(_on_anim_files_selected)
 
 
 func open_new() -> void:
@@ -231,7 +235,7 @@ func _refresh_animation_rows() -> void:
 
 func _build_anim_row(state: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(0, 30)
+	row.custom_minimum_size = Vector2(0, 32)
 
 	var state_label := Label.new()
 	state_label.text = state
@@ -239,56 +243,48 @@ func _build_anim_row(state: String) -> HBoxContainer:
 	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(state_label)
 
-	var fps := SpinBox.new()
-	fps.name = "Fps"
-	fps.min_value = 1.0
-	fps.max_value = 30.0
-	fps.value = 8.0
-	fps.custom_minimum_size = Vector2(52, 0)
-	fps.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	fps.value_changed.connect(_on_anim_fps_changed.bind(state))
-	row.add_child(fps)
+	var frames_option := OptionButton.new()
+	frames_option.name = "FramesOption"
+	frames_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	frames_option.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.add_child(frames_option)
 
-	var path_label := Label.new()
-	path_label.name = "PathLabel"
-	path_label.text = "placeholder"
-	path_label.modulate = Color(0.6, 0.6, 0.65)
-	path_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	path_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	row.add_child(path_label)
+	var add_button := Button.new()
+	add_button.text = "+"
+	add_button.custom_minimum_size = Vector2(30, 0)
+	add_button.pressed.connect(_on_anim_add_pressed.bind(state))
+	row.add_child(add_button)
 
-	var set_button := Button.new()
-	set_button.name = "SetButton"
-	set_button.text = "Set..."
-	set_button.custom_minimum_size = Vector2(64, 0)
-	set_button.pressed.connect(_on_anim_set_pressed.bind(state))
-	row.add_child(set_button)
+	var fps_option := OptionButton.new()
+	fps_option.name = "FpsOption"
+	fps_option.custom_minimum_size = Vector2(56, 0)
+	for fps in FPS_OPTIONS:
+		fps_option.add_item("%d fps" % fps)
+	fps_option.item_selected.connect(_on_anim_fps_selected.bind(state))
+	row.add_child(fps_option)
 
 	var clear_button := Button.new()
-	clear_button.name = "ClearButton"
 	clear_button.text = "x"
 	clear_button.custom_minimum_size = Vector2(28, 0)
 	clear_button.pressed.connect(_on_anim_clear_pressed.bind(state))
 	row.add_child(clear_button)
 
-	if _animations.has(state):
-		var spec: Dictionary = _animations[state]
-		if spec.has("folder"):
-			path_label.text = str(spec["folder"])
-			fps.value = float(spec.get("fps", 8.0))
-		elif spec.has("frames"):
-			path_label.text = "%d frames" % (spec["frames"] as Array).size()
-			fps.value = float(spec.get("fps", 8.0))
-		elif spec.has("sheet"):
-			path_label.text = str(spec["sheet"])
-			fps.value = float(spec.get("fps", 8.0))
+	var spec: Dictionary = _animations.get(state, {})
+	var frames: Array = spec.get("frames", [])
+	if frames.is_empty():
+		frames_option.add_item("placeholder (no frames)", 0)
+		frames_option.disabled = true
+	else:
+		for i in frames.size():
+			var file_name := String(frames[i]).get_file()
+			frames_option.add_item("Frame %d: %s" % [i + 1, file_name], i)
+	fps_option.select(maxi(0, FPS_OPTIONS.find(int(spec.get("fps", 8.0)))))
 	return row
 
 
-func _on_anim_set_pressed(state: String) -> void:
+func _on_anim_add_pressed(state: String) -> void:
 	_anim_dialog_state = state
-	anim_dialog.popup_centered_ratio(0.5)
+	anim_dialog.popup_centered_ratio(0.6)
 
 
 func _on_anim_clear_pressed(state: String) -> void:
@@ -296,11 +292,9 @@ func _on_anim_clear_pressed(state: String) -> void:
 	_refresh_animation_rows()
 
 
-func _on_anim_fps_changed(value: float, state: String) -> void:
-	if not _animations.has(state):
-		return
-	var spec: Dictionary = _animations[state]
-	spec["fps"] = value
+func _on_anim_fps_selected(index: int, state: String) -> void:
+	var spec: Dictionary = _animations.get(state, {})
+	spec["fps"] = float(FPS_OPTIONS[index])
 	_animations[state] = spec
 
 
@@ -308,8 +302,43 @@ func _on_anim_folder_selected(path: String) -> void:
 	var state := _anim_dialog_state
 	if state.is_empty():
 		return
-	_animations[state] = {"folder": path, "fps": 8.0}
+	var spec: Dictionary = _animations.get(state, {"fps": 8.0})
+	var files := _collect_image_files(path)
+	for f in files:
+		_append_frame(spec, f)
+	_animations[state] = spec
 	_refresh_animation_rows()
+
+
+func _on_anim_files_selected(paths: PackedStringArray) -> void:
+	var state := _anim_dialog_state
+	if state.is_empty():
+		return
+	var spec: Dictionary = _animations.get(state, {"fps": 8.0})
+	for f in paths:
+		_append_frame(spec, f)
+	_animations[state] = spec
+	_refresh_animation_rows()
+
+
+func _append_frame(spec: Dictionary, path: String) -> void:
+	var frames: Array = spec.get("frames", [])
+	if not frames.has(path):
+		frames.append(path)
+	spec["frames"] = frames
+
+
+func _collect_image_files(path: String) -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return out
+	var files := dir.get_files()
+	files.sort()
+	for f in files:
+		if f.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+			out.append(path.path_join(f))
+	return out
 
 
 func _on_character_selected(path: String) -> void:
@@ -318,6 +347,22 @@ func _on_character_selected(path: String) -> void:
 
 
 func _on_project_selected(path: String) -> void:
+	_project_path = path
+	_update_project_label()
+
+
+func _on_project_path_submitted(text: String) -> void:
+	var path := text.strip_edges()
+	if path.is_empty():
+		_project_path = ""
+		_update_project_label()
+		return
+	var expanded := path
+	if path.begins_with("~"):
+		expanded = OS.get_environment("HOME").path_join(path.substr(1).trim_prefix("/"))
+	if not expanded.begins_with("res://") and not DirAccess.dir_exists_absolute(expanded):
+		push_warning("Invalid folder path: %s" % path)
+		return
 	_project_path = path
 	_update_project_label()
 
@@ -331,8 +376,8 @@ func _update_character_preview() -> void:
 
 
 func _update_project_label() -> void:
-	project_label.text = _project_path if not _project_path.is_empty() else "--"
-	project_label.tooltip_text = _project_path
+	project_path_edit.text = _project_path
+	project_path_edit.tooltip_text = _project_path
 
 
 func _on_save_pressed() -> void:

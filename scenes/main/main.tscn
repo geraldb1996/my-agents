@@ -48,10 +48,13 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 5.0
 
 [node name="ChatPanel" parent="Panels" instance=ExtResource("4_chat")]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 3.0
 
 [node name="AgentEditor" parent="." instance=ExtResource("5_edit")]
 unique_name_in_owner = true

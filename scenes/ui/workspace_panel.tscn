@@ -66,13 +66,12 @@ text = "Start"
 [node name="ProjectRow" type="HBoxContainer" parent="Root"]
 layout_mode = 2
 
-[node name="ProjectLabel" type="Label" parent="Root/ProjectRow"]
+[node name="ProjectPathEdit" type="LineEdit" parent="Root/ProjectRow"]
 unique_name_in_owner = true
 layout_mode = 2
-modulate = Color(0.7, 0.7, 0.75, 1)
-text = "--"
-size_flags_horizontal = 3
+placeholder_text = "Paste project path or Select Folder"
 text_overrun_behavior = 3
+size_flags_horizontal = 3
 
 [node name="SelectProjectButton" type="Button" parent="Root/ProjectRow"]
 unique_name_in_owner = true
@@ -144,11 +143,21 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "Output"
 
-[node name="OutputScroll" type="ScrollContainer" parent="Root"]
+[node name="OutputArea" type="Control" parent="Root"]
 layout_mode = 2
 size_flags_vertical = 3
+clip_contents = true
 
-[node name="OutputLog" type="RichTextLabel" parent="Root/OutputScroll"]
+[node name="OutputScroll" type="ScrollContainer" parent="Root/OutputArea"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+
+[node name="OutputLog" type="RichTextLabel" parent="Root/OutputArea/OutputScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -158,6 +167,6 @@ text = ""
 
 [node name="ProjectDialog" type="FileDialog" parent="."]
 unique_name_in_owner = true
-file_mode = 1
+file_mode = 2
 access = 2
 title = "Select Project Folder"

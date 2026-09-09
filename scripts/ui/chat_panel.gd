@@ -24,11 +24,23 @@ var _typing: Dictionary = {}
 
 func _ready() -> void:
 	%SendButton.pressed.connect(_on_send_pressed)
+	%ClearButton.pressed.connect(_on_clear_pressed)
+	%ClearDialog.confirmed.connect(_on_clear_confirmed)
 	input_edit.text_submitted.connect(func(_t): _on_send_pressed())
 	EventBus.chat_message.connect(_on_chat_message)
 	EventBus.agent_state_changed.connect(_on_state_changed)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
 	_populate_history()
+
+
+func _on_clear_pressed() -> void:
+	%ClearDialog.popup_centered()
+
+
+func _on_clear_confirmed() -> void:
+	ProfileStore.clear_chat_history()
+	for child in messages_box.get_children():
+		child.queue_free()
 
 
 func _populate_history() -> void:
@@ -57,7 +69,9 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	var color: Color = Color(1, 1, 1)
 	if is_agent:
 		color = SENDER_COLORS[hash(sender) % SENDER_COLORS.size()]
-	sender_label.text = sender if is_agent else "You"
+	elif sender == "system":
+		color = Color(0.75, 0.75, 0.5)
+	sender_label.text = sender if is_agent else ("You" if sender != "system" else "System")
 	sender_label.modulate = color
 	sender_label.add_theme_font_size_override("font_size", 13)
 	sender_label.add_theme_color_override("font_color", color)
@@ -130,8 +144,30 @@ func _route_message(text: String, mentions: Array) -> void:
 	elif not AgentManager.selected_agent_id.is_empty():
 		targets.append(AgentManager.selected_agent_id)
 
+	if targets.is_empty():
+		_add_system_hint("No agent targeted. Select an agent in the left panel or use @AgentName / @all.")
+		return
+
 	for agent_id in targets:
-		AgentManager.send_chat_message(agent_id, text)
+		var result := AgentManager.send_chat_message(agent_id, text)
+		if result != AgentManager.TASK_OK:
+			var profile := ProfileStore.get_profile(agent_id)
+			var who := profile.name if profile != null else agent_id
+			var reason := ""
+			match result:
+				AgentManager.TASK_NO_PROJECT:
+					reason = "%s has no project set. Open its editor or use Select Folder in Workspace." % who
+				AgentManager.TASK_BUSY:
+					reason = "%s is busy with another task. Wait for it to finish." % who
+				_:
+					reason = "%s not reached (OpenCode failed to launch). Check its output log." % who
+			_add_system_hint(reason)
+
+
+func _add_system_hint(content: String) -> void:
+	var ts := Time.get_unix_time_from_system() * 1000
+	ProfileStore.append_chat_message("system", content, [], ts, false)
+	_add_bubble("system", content, ts, false)
 
 
 func _on_state_changed(agent_id: String, state: String) -> void:

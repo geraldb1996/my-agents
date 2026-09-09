@@ -17,6 +17,11 @@ const TOOL_STATES := {
 	"ask_user": "question",
 }
 
+const TASK_OK := 0
+const TASK_NO_PROJECT := 1
+const TASK_BUSY := 2
+const TASK_LAUNCH_FAILED := 3
+
 var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
@@ -75,18 +80,18 @@ func stop_agent(agent_id: String) -> void:
 	EventBus.agent_stopped.emit(agent_id)
 
 
-func send_task(agent_id: String, task: String) -> bool:
+func send_task(agent_id: String, task: String) -> int:
 	var profile := get_profile(agent_id)
 	if profile == null:
-		return false
+		return TASK_LAUNCH_FAILED
 	if profile.project.is_empty():
 		emit_output(agent_id, "[error] No project/workspace set. Select a folder first.")
 		set_state(agent_id, "error")
-		return false
+		return TASK_NO_PROJECT
 	var runner: OpenCodeRunner = _runners.get(agent_id)
 	if runner != null and runner.running:
 		emit_output(agent_id, "[warn] Agent busy. Wait for the current task to finish.")
-		return false
+		return TASK_BUSY
 
 	var session := get_session(agent_id)
 	session["task"] = task
@@ -94,11 +99,12 @@ func send_task(agent_id: String, task: String) -> bool:
 	ProfileStore.save_session(agent_id, session)
 	EventBus.agent_task_updated.emit(agent_id, task)
 	set_state(agent_id, "thinking")
-	_spawn_runner(agent_id, task)
-	return true
+	if not _spawn_runner(agent_id, task):
+		return TASK_LAUNCH_FAILED
+	return TASK_OK
 
 
-func send_chat_message(agent_id: String, content: String) -> bool:
+func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, "[Team chat] %s" % content)
 
 
@@ -127,7 +133,7 @@ func emit_output(agent_id: String, line: String) -> void:
 	EventBus.agent_output.emit(agent_id, line)
 
 
-func _spawn_runner(agent_id: String, task: String) -> void:
+func _spawn_runner(agent_id: String, task: String) -> bool:
 	var profile := get_profile(agent_id)
 	var session := get_session(agent_id)
 	var runner := OpenCodeRunner.new()
@@ -149,12 +155,13 @@ func _spawn_runner(agent_id: String, task: String) -> void:
 		runner.queue_free()
 		_runners.erase(agent_id)
 		set_state(agent_id, "error")
-		return
+		return false
 
 	runner.event_received.connect(_handle_event)
 	runner.process_finished.connect(_on_process_finished)
 	emit_output(agent_id, "[start] opencode run (session: %s)" % str(session.get("opencode_session", "new")))
 	queue_git_refresh(agent_id, 1.5)
+	return true
 
 
 func _on_process_finished(agent_id: String, exit_code: int) -> void:

@@ -170,13 +170,11 @@ layout_mode = 2
 layout_mode = 2
 text = "Project"
 
-[node name="ProjectLabel" type="Label" parent="Dialog/Scroll/Form/ProjectRow"]
+[node name="ProjectPathEdit" type="LineEdit" parent="Dialog/Scroll/Form/ProjectRow"]
 unique_name_in_owner = true
 layout_mode = 2
-modulate = Color(0.7, 0.7, 0.75, 1)
-text = "--"
+placeholder_text = "Paste path or Select..."
 size_flags_horizontal = 3
-text_overrun_behavior = 3
 
 [node name="ProjectButton" type="Button" parent="Dialog/Scroll/Form/ProjectRow"]
 unique_name_in_owner = true
@@ -234,7 +232,7 @@ title = "Select Character Image"
 
 [node name="ProjectDialog" type="FileDialog" parent="."]
 unique_name_in_owner = true
-file_mode = 1
+file_mode = 2
 access = 2
 title = "Select Project Folder"
 
@@ -242,4 +240,6 @@ title = "Select Project Folder"
 unique_name_in_owner = true
 file_mode = 1
 access = 2
-title = "Select Animation Frames Folder"
+filters = PackedStringArray("*.png ; PNG Images", "*.jpg, *.jpeg ; JPEG Images", "*.webp ; WebP Images")
+allow_multiple_selection = true
+title = "Select Animation Frames (multiple)"
