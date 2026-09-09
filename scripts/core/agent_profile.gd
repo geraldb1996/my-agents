@@ -11,6 +11,7 @@ const DEFAULT_CHARACTER := "res://images/agents/agent.png"
 @export var id: String = ""
 @export var name: String = "New Agent"
 @export var model: String = ""
+@export var model_variant: String = ""
 @export_multiline var personality: String = ""
 @export var skills: Array[String] = []
 @export var character: String = DEFAULT_CHARACTER
@@ -49,6 +50,7 @@ func to_dict() -> Dictionary:
 		"id": id,
 		"name": name,
 		"model": model,
+		"model_variant": model_variant,
 		"personality": personality,
 		"skills": skills,
 		"character": character,
@@ -65,6 +67,7 @@ static func from_dict(data: Dictionary) -> AgentProfile:
 	p.id = str(data.get("id", ""))
 	p.name = str(data.get("name", "New Agent"))
 	p.model = str(data.get("model", ""))
+	p.model_variant = str(data.get("model_variant", str(data.get("variant", ""))))
 	p.personality = str(data.get("personality", ""))
 	var raw_skills: Array = data.get("skills", [])
 	p.skills.assign(raw_skills)

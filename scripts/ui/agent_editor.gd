@@ -4,6 +4,8 @@ extends Control
 @onready var name_edit: LineEdit = %NameEdit
 @onready var model_select: OptionButton = %ModelSelect
 @onready var model_custom_edit: LineEdit = %ModelCustomEdit
+@onready var variant_select: OptionButton = %VariantSelect
+@onready var variant_custom_edit: LineEdit = %VariantCustomEdit
 @onready var opencode_agent_edit: LineEdit = %OpenCodeAgentEdit
 @onready var personality_edit: TextEdit = %PersonalityEdit
 @onready var skills_box: VBoxContainer = %SkillsBox
@@ -17,6 +19,7 @@ extends Control
 @onready var project_dialog: FileDialog = %ProjectDialog
 
 const FPS_OPTIONS := [4, 6, 8, 10, 12, 15, 24, 30]
+const VARIANT_OPTIONS := ["", "minimal", "low", "medium", "high", "max"]
 
 var _editing_id: String = ""
 var _character_path: String = AgentProfile.DEFAULT_CHARACTER
@@ -37,6 +40,8 @@ func _ready() -> void:
 	%ModelRefreshButton.pressed.connect(_on_refresh_models_pressed)
 	model_select.item_selected.connect(_on_model_item_selected)
 	ModelCatalog.models_loaded.connect(_on_models_loaded)
+	_populate_variant_items()
+	variant_select.item_selected.connect(_on_variant_item_selected)
 	%SkillRefreshButton.pressed.connect(_on_refresh_skills_pressed)
 	skill_select.item_selected.connect(_on_skill_item_selected)
 	SkillCatalog.skills_loaded.connect(_on_skills_loaded)
@@ -63,6 +68,7 @@ func open_profile(profile: AgentProfile) -> void:
 	_update_project_label()
 	_ensure_catalogs()
 	_select_model(profile.model)
+	_select_variant(profile.model_variant)
 	visible = true
 
 
@@ -80,6 +86,8 @@ func _populate_defaults() -> void:
 	_select_model("")
 	model_custom_edit.text = ""
 	model_custom_edit.visible = false
+	_select_variant("")
+	variant_custom_edit.visible = false
 	_ensure_catalogs()
 	visible = true
 	name_edit.grab_focus()
@@ -149,6 +157,53 @@ func _on_model_item_selected(index: int) -> void:
 
 func _on_refresh_models_pressed() -> void:
 	ModelCatalog.refresh()
+
+
+func _populate_variant_items() -> void:
+	variant_select.clear()
+	variant_select.add_item("Default (none)", 0)
+	for v in VARIANT_OPTIONS:
+		if v.is_empty():
+			continue
+		variant_select.add_item(v)
+	variant_select.add_item("Custom...", -1)
+
+
+func _select_variant(variant: String) -> void:
+	if variant_select.item_count == 0:
+		_populate_variant_items()
+	variant_custom_edit.text = variant
+	if variant.is_empty():
+		variant_select.select(0)
+		variant_custom_edit.visible = false
+		return
+	for i in range(1, variant_select.item_count - 1):
+		if variant_select.get_item_text(i) == variant:
+			variant_select.select(i)
+			variant_custom_edit.visible = false
+			return
+	var custom_idx := variant_select.item_count - 1
+	variant_select.select(custom_idx)
+	variant_custom_edit.visible = true
+	variant_custom_edit.text = variant
+
+
+func _get_selected_variant() -> String:
+	if variant_select.selected < 0:
+		return variant_custom_edit.text.strip_edges()
+	if variant_select.selected == 0:
+		return ""
+	var custom_idx := variant_select.item_count - 1
+	if variant_select.selected == custom_idx:
+		return variant_custom_edit.text.strip_edges()
+	return variant_select.get_item_text(variant_select.selected)
+
+
+func _on_variant_item_selected(index: int) -> void:
+	var custom_idx := variant_select.item_count - 1
+	variant_custom_edit.visible = index == custom_idx
+	if index == custom_idx:
+		variant_custom_edit.grab_focus()
 
 
 func _refresh_skills(skills: Array) -> void:
@@ -387,11 +442,13 @@ func _on_save_pressed() -> void:
 		name_edit.grab_focus()
 		return
 	var model := _get_selected_model()
+	var variant := _get_selected_variant()
 	var profile: AgentProfile
 	if not _editing_id.is_empty() and ProfileStore.profiles.has(_editing_id):
 		profile = ProfileStore.profiles[_editing_id]
 		profile.name = agent_name
 		profile.model = model
+		profile.model_variant = variant
 		profile.opencode_agent = opencode_agent_edit.text.strip_edges()
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()
@@ -403,6 +460,7 @@ func _on_save_pressed() -> void:
 		profile.ensure_id()
 		profile.name = agent_name
 		profile.model = model
+		profile.model_variant = variant
 		profile.opencode_agent = opencode_agent_edit.text.strip_edges()
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()

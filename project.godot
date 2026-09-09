@@ -25,7 +25,9 @@ AgentManager="*res://scripts/autoload/agent_manager.gd"
 
 [display]
 
-window/stretch/mode="canvas_items"
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 
 [physics]

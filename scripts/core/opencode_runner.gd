@@ -7,6 +7,7 @@ signal process_finished(agent_id: String, exit_code: int)
 var agent_id: String = ""
 var project: String = ""
 var model: String = ""
+var variant: String = ""
 var opencode_agent: String = ""
 var session_id: String = ""
 var task: String = ""
@@ -25,6 +26,7 @@ func start(opts: Dictionary) -> bool:
 	agent_id = str(opts.get("agent_id", ""))
 	project = str(opts.get("project", ""))
 	model = str(opts.get("model", ""))
+	variant = str(opts.get("variant", ""))
 	opencode_agent = str(opts.get("opencode_agent", ""))
 	session_id = str(opts.get("session_id", ""))
 	task = str(opts.get("task", ""))
@@ -36,6 +38,8 @@ func start(opts: Dictionary) -> bool:
 	var args := PackedStringArray(["run", "--format", "json"])
 	if not model.is_empty():
 		args.append_array(["-m", model])
+	if not variant.is_empty():
+		args.append_array(["--variant", variant])
 	if not opencode_agent.is_empty():
 		args.append_array(["--agent", opencode_agent])
 	if not session_id.is_empty():

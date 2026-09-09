@@ -22,6 +22,8 @@ const TASK_NO_PROJECT := 1
 const TASK_BUSY := 2
 const TASK_LAUNCH_FAILED := 3
 
+const CONTEXT_LIMIT := 200000
+
 var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
@@ -108,6 +110,31 @@ func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, "[Team chat] %s" % content)
 
 
+func reset_session(agent_id: String) -> void:
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner != null and runner.running:
+		runner.stop()
+	_runners.erase(agent_id)
+	ProfileStore.delete_session(agent_id)
+	sessions.erase(agent_id)
+	_pending_text.erase(agent_id)
+	emit_output(agent_id, "[session] reset — next task starts fresh")
+	set_state(agent_id, "offline")
+
+
+func set_variant(agent_id: String, variant: String) -> void:
+	var profile := get_profile(agent_id)
+	if profile == null:
+		return
+	profile.model_variant = variant
+	ProfileStore.save_profile(profile)
+	if variant.is_empty():
+		emit_output(agent_id, "[variant] default")
+	else:
+		emit_output(agent_id, "[variant] %s" % variant)
+	EventBus.profile_saved.emit(profile)
+
+
 func add_temp_skill(agent_id: String, skill: String) -> void:
 	var profile := get_profile(agent_id)
 	if profile == null:
@@ -145,6 +172,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 		"agent_id": agent_id,
 		"project": profile.project,
 		"model": profile.model,
+		"variant": profile.model_variant,
 		"opencode_agent": profile.opencode_agent,
 		"session_id": str(session.get("opencode_session", "")),
 		"task": task,
@@ -203,6 +231,7 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 			if str(part.get("type", "")) == "tool":
 				_handle_tool(agent_id, part)
 		"step_finish":
+			_emit_context_usage(agent_id, part)
 			if str(part.get("reason", "")) == "stop":
 				_finish_task(agent_id)
 			else:
@@ -210,6 +239,20 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 		_:
 			if etype.contains("permission"):
 				set_state(agent_id, "approval")
+
+
+func _emit_context_usage(agent_id: String, part: Dictionary) -> void:
+	var tokens: Dictionary = part.get("tokens", {})
+	if tokens is not Dictionary:
+		tokens = {}
+	var input_tokens := int(tokens.get("input", 0))
+	var cache_read := 0
+	var cache: Variant = tokens.get("cache", {})
+	if cache is Dictionary:
+		cache_read = int(cache.get("read", 0))
+	var context_tokens := input_tokens + cache_read
+	var pct := clampf(float(context_tokens) / float(CONTEXT_LIMIT) * 100.0, 0.0, 100.0)
+	EventBus.agent_context_usage.emit(agent_id, pct, context_tokens)
 
 
 func _handle_tool(agent_id: String, part: Dictionary) -> void:

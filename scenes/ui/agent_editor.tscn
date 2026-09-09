@@ -94,6 +94,24 @@ visible = false
 layout_mode = 2
 placeholder_text = "provider/model custom..."
 
+[node name="VariantLabel" type="Label" parent="Dialog/Scroll/Form"]
+layout_mode = 2
+text = "Variant (if any)"
+
+[node name="VariantRow" type="HBoxContainer" parent="Dialog/Scroll/Form"]
+layout_mode = 2
+
+[node name="VariantSelect" type="OptionButton" parent="Dialog/Scroll/Form/VariantRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VariantCustomEdit" type="LineEdit" parent="Dialog/Scroll/Form/VariantRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+placeholder_text = "custom variant..."
+
 [node name="OpenCodeAgentLabel" type="Label" parent="Dialog/Scroll/Form"]
 layout_mode = 2
 text = "OpenCode agent (optional)"
