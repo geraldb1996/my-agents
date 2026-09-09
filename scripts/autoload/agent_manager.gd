@@ -28,7 +28,9 @@ var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
 var _runners: Dictionary = {}
-var _pending_text: Dictionary = {}
+var _pending_thinking: Dictionary = {}
+var _pending_response: Dictionary = {}
+var _posted_reply: Dictionary = {}
 var _git_refresh_queue: Dictionary = {}
 var _git_timers: Dictionary = {}
 
@@ -87,12 +89,12 @@ func send_task(agent_id: String, task: String) -> int:
 	if profile == null:
 		return TASK_LAUNCH_FAILED
 	if profile.project.is_empty():
-		emit_output(agent_id, "[error] No project/workspace set. Select a folder first.")
+		emit_chat_error(agent_id, "No project/workspace set. Select a folder first.")
 		set_state(agent_id, "error")
 		return TASK_NO_PROJECT
 	var runner: OpenCodeRunner = _runners.get(agent_id)
 	if runner != null and runner.running:
-		emit_output(agent_id, "[warn] Agent busy. Wait for the current task to finish.")
+		emit_chat_error(agent_id, "Agent busy. Wait for the current task to finish.")
 		return TASK_BUSY
 
 	var session := get_session(agent_id)
@@ -117,7 +119,9 @@ func reset_session(agent_id: String) -> void:
 	_runners.erase(agent_id)
 	ProfileStore.delete_session(agent_id)
 	sessions.erase(agent_id)
-	_pending_text.erase(agent_id)
+	_pending_thinking.erase(agent_id)
+	_pending_response.erase(agent_id)
+	_posted_reply.erase(agent_id)
 	emit_output(agent_id, "[session] reset — next task starts fresh")
 	set_state(agent_id, "offline")
 
@@ -160,6 +164,15 @@ func emit_output(agent_id: String, line: String) -> void:
 	EventBus.agent_output.emit(agent_id, line)
 
 
+func emit_chat_error(agent_id: String, message: String) -> void:
+	emit_output(agent_id, "[error] " + message)
+	var profile := get_profile(agent_id)
+	var sender := profile.name if profile != null else agent_id
+	var ts := Time.get_unix_time_from_system() * 1000
+	ProfileStore.append_chat_message(sender, "[error] " + message, [], ts, true)
+	EventBus.chat_message.emit(sender, "[error] " + message, [], ts, true)
+
+
 func _spawn_runner(agent_id: String, task: String) -> bool:
 	var profile := get_profile(agent_id)
 	var session := get_session(agent_id)
@@ -179,7 +192,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 		"skills_context": ", ".join(profile.get_all_skills()),
 	})
 	if not started:
-		emit_output(agent_id, "[error] Failed to launch opencode CLI. Is it in PATH?")
+		emit_chat_error(agent_id, "Failed to launch opencode CLI. Is it in PATH?")
 		runner.queue_free()
 		_runners.erase(agent_id)
 		set_state(agent_id, "error")
@@ -198,9 +211,11 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 		_runners.erase(agent_id)
 		runner.queue_free()
 	if exit_code != 0:
-		emit_output(agent_id, "[end] process exited with code %d" % exit_code)
+		emit_chat_error(agent_id, "Process exited with code %d" % exit_code)
 		set_state(agent_id, "error")
 	else:
+		if not _posted_reply.get(agent_id, false):
+			_post_reply(agent_id)
 		emit_output(agent_id, "[end] done")
 	queue_git_refresh(agent_id, 0.5)
 
@@ -222,11 +237,16 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 	match etype:
 		"step_start":
 			set_state(agent_id, "thinking")
+		"reasoning":
+			var reason_text: String = str(part.get("text", ""))
+			if not reason_text.is_empty():
+				_pending_thinking[agent_id] = _pending_thinking.get(agent_id, "") + reason_text
+				emit_output(agent_id, "[think] " + reason_text)
 		"text":
 			if str(part.get("type", "")) == "text":
 				var text: String = str(part.get("text", ""))
 				if not text.is_empty():
-					_pending_text[agent_id] = _pending_text.get(agent_id, "") + text
+					_pending_response[agent_id] = _pending_response.get(agent_id, "") + text
 		"tool_use":
 			if str(part.get("type", "")) == "tool":
 				_handle_tool(agent_id, part)
@@ -275,15 +295,15 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 
 	match status:
 		"pending":
+			emit_output(agent_id, "[tool] %s (started)" % note)
 			if tool_name == "ask_user":
 				set_state(agent_id, "question")
 			else:
 				set_state(agent_id, base_state)
 		"running":
 			set_state(agent_id, base_state)
-			emit_output(agent_id, "> %s" % note)
 		"completed":
-			emit_output(agent_id, "+ %s" % note)
+			emit_output(agent_id, "[tool] %s (done)" % note)
 			set_state(agent_id, base_state)
 			_flash_state(agent_id, "success", 1.2)
 		"error":
@@ -297,13 +317,7 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 
 
 func _finish_task(agent_id: String) -> void:
-	var reply: String = _pending_text.get(agent_id, "").strip_edges()
-	_pending_text[agent_id] = ""
-	var profile := get_profile(agent_id)
-	if not reply.is_empty() and profile != null:
-		var ts := Time.get_unix_time_from_system() * 1000
-		ProfileStore.append_chat_message(profile.name, reply, [], ts, true)
-		EventBus.chat_message.emit(profile.name, reply, [], ts, true)
+	_post_reply(agent_id)
 	var session := get_session(agent_id)
 	session["task"] = ""
 	session["state"] = "success"
@@ -312,6 +326,23 @@ func _finish_task(agent_id: String) -> void:
 	await get_tree().create_timer(2.5).timeout
 	if sessions.has(agent_id) and str(sessions[agent_id].get("state", "")) == "success":
 		set_state(agent_id, "idle")
+
+
+func _post_reply(agent_id: String) -> void:
+	if _posted_reply.get(agent_id, false):
+		return
+	var reply: String = _pending_response.get(agent_id, "").strip_edges()
+	_pending_response[agent_id] = ""
+	_pending_thinking.erase(agent_id)
+	if reply.is_empty():
+		return
+	_posted_reply[agent_id] = true
+	var profile := get_profile(agent_id)
+	if profile == null:
+		return
+	var ts := Time.get_unix_time_from_system() * 1000
+	ProfileStore.append_chat_message(profile.name, reply, [], ts, true)
+	EventBus.chat_message.emit(profile.name, reply, [], ts, true)
 
 
 func _flash_state(agent_id: String, state: String, duration: float) -> void:

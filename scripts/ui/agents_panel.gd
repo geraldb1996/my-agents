@@ -65,14 +65,9 @@ func _build_card(profile: AgentProfile) -> Control:
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	card.add_child(row)
 
-	var avatar := TextureRect.new()
+	var avatar := CharacterAvatar.new()
 	avatar.custom_minimum_size = Vector2(48, 48)
-	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tex := _load_texture(profile.character)
-	if tex != null:
-		avatar.texture = tex
+	avatar.set_profile(profile)
 	row.add_child(avatar)
 
 	var info := VBoxContainer.new()
@@ -133,6 +128,12 @@ func _build_card(profile: AgentProfile) -> Control:
 	start_button.custom_minimum_size = Vector2(56, 28)
 	start_button.pressed.connect(_on_start_pressed.bind(profile.id, start_button))
 	actions.add_child(start_button)
+	var ses_button := Button.new()
+	ses_button.text = "Ses"
+	ses_button.custom_minimum_size = Vector2(56, 28)
+	ses_button.tooltip_text = "Reset session"
+	ses_button.pressed.connect(_on_ses_pressed.bind(profile.id))
+	actions.add_child(ses_button)
 	var var_button := Button.new()
 	var_button.text = "Var"
 	var_button.custom_minimum_size = Vector2(56, 28)
@@ -180,6 +181,10 @@ func _on_context_menu_pressed(index: int) -> void:
 			edit_agent_requested.emit(_context_target)
 		2:
 			delete_agent_requested.emit(_context_target)
+
+
+func _on_ses_pressed(agent_id: String) -> void:
+	AgentManager.reset_session(agent_id)
 
 
 func _on_var_pressed(agent_id: String, button: Button) -> void:
@@ -279,14 +284,10 @@ func _update_card_state(agent_id: String, state: String) -> void:
 		return
 	var state_label: Label = card.get_meta("state_label")
 	var start_button: Button = card.get_meta("start_button")
-	var avatar: TextureRect = card.get_meta("avatar")
+	var avatar: CharacterAvatar = card.get_meta("avatar")
 	state_label.text = STATE_LABELS.get(state, state.capitalize())
-	var color: Color = CharacterView.STATE_COLORS.get(state, Color(1, 1, 1))
 	start_button.text = "Stop" if state in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval", "success"] else "Start"
-	if state == "offline":
-		avatar.modulate = Color(0.55, 0.55, 0.6, 0.85)
-	else:
-		avatar.modulate = color.lerp(Color(1, 1, 1), 0.65)
+	avatar.set_state(state)
 
 
 func _get_state(agent_id: String) -> String:
@@ -333,9 +334,3 @@ func _update_bar_color(bar: ProgressBar, percent: float) -> void:
 	var sb := _context_bar_fill()
 	sb.bg_color = col
 	bar.add_theme_stylebox_override("fill", sb)
-
-
-func _load_texture(path: String) -> Texture2D:
-	if path.is_empty() or not FileAccess.file_exists(path):
-		return null
-	return load(path) as Texture2D

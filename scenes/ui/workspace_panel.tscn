@@ -88,6 +88,18 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 15
 text = "--"
 
+[node name="SkillSourceOption" type="OptionButton" parent="Root/StateRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+item_count = 3
+popup/item_0/text = "All Skills"
+popup/item_0/id = 0
+popup/item_1/text = "Global"
+popup/item_1/id = 1
+popup/item_2/text = "Local"
+popup/item_2/id = 2
+
 [node name="TempSkillEdit" type="LineEdit" parent="Root/StateRow"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -159,6 +171,7 @@ size_flags_vertical = 3
 clip_contents = true
 
 [node name="OutputScroll" type="ScrollContainer" parent="Root/OutputArea"]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

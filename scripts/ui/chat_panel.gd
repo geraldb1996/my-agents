@@ -56,22 +56,42 @@ func _on_chat_message(sender: String, content: String, _mentions: Array, timesta
 
 
 func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool) -> void:
+	var is_user := sender == "user"
+	var is_system := sender == "system"
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+	if is_user:
+		var spacer_left := Control.new()
+		spacer_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(spacer_left)
+
 	var bubble := PanelContainer.new()
-	bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bubble.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var sb := StyleBoxFlat.new()
+	if is_user:
+		sb.bg_color = Color(0.28, 0.42, 0.6, 1)
+	elif is_system:
+		sb.bg_color = Color(0.3, 0.28, 0.22, 1)
+	else:
+		sb.bg_color = Color(0.2, 0.21, 0.27, 1)
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 10.0
+	sb.content_margin_right = 10.0
+	sb.content_margin_top = 6.0
+	sb.content_margin_bottom = 6.0
+	bubble.add_theme_stylebox_override("panel", sb)
 	var inner := VBoxContainer.new()
-	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.size_flags_horizontal = Control.SIZE_FILL
 
 	var header := HBoxContainer.new()
 	var sender_label := Label.new()
 	var color: Color = Color(1, 1, 1)
 	if is_agent:
 		color = SENDER_COLORS[hash(sender) % SENDER_COLORS.size()]
-	elif sender == "system":
+	elif is_system:
 		color = Color(0.75, 0.75, 0.5)
-	sender_label.text = sender if is_agent else ("You" if sender != "system" else "System")
+	sender_label.text = sender if is_agent else ("You" if is_user else "System")
 	sender_label.modulate = color
 	sender_label.add_theme_font_size_override("font_size", 13)
 	sender_label.add_theme_color_override("font_color", color)
@@ -89,11 +109,18 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	var body := Label.new()
 	body.text = content
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_horizontal = Control.SIZE_FILL
+	body.custom_minimum_size = Vector2(280, 0)
 	inner.add_child(body)
 
 	bubble.add_child(inner)
 	row.add_child(bubble)
+
+	if not is_user:
+		var spacer_right := Control.new()
+		spacer_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(spacer_right)
+
 	messages_box.add_child(row)
 
 

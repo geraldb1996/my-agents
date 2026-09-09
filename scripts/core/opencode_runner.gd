@@ -35,7 +35,7 @@ func start(opts: Dictionary) -> bool:
 	if agent_id.is_empty() or project.is_empty():
 		return false
 
-	var args := PackedStringArray(["run", "--format", "json"])
+	var args := PackedStringArray(["run", "--format", "json", "--thinking"])
 	if not model.is_empty():
 		args.append_array(["-m", model])
 	if not variant.is_empty():
@@ -80,7 +80,7 @@ func poll() -> void:
 		return
 	var file := FileAccess.open(_out_path, FileAccess.READ)
 	if file != null:
-		var text := file.get_as_text()
+		var text := _read_file(file)
 		file.close()
 		if text.begins_with(_last_text):
 			var new_part := text.substr(_last_text.length())
@@ -94,6 +94,11 @@ func poll() -> void:
 	if _pid > 0 and not OS.is_process_running(_pid):
 		running = false
 		process_finished.emit(agent_id, 0 if _completed_ok else -1)
+
+
+func _read_file(file: FileAccess) -> String:
+	var bytes := file.get_buffer(file.get_length())
+	return bytes.get_string_from_utf8()
 
 
 func _build_prompt() -> String:

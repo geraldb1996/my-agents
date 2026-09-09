@@ -9,9 +9,11 @@ extends PanelContainer
 @onready var files_label: Label = %FilesLabel
 @onready var git_label: Label = %GitLabel
 @onready var output_log: RichTextLabel = %OutputLog
+@onready var output_scroll: ScrollContainer = %OutputScroll
 @onready var temp_skill_edit: LineEdit = %TempSkillEdit
 @onready var project_dialog: FileDialog = %ProjectDialog
 @onready var agent_name_label: Label = %AgentNameLabel
+@onready var skill_source_option: OptionButton = %SkillSourceOption
 
 var _current_id: String = ""
 
@@ -29,6 +31,8 @@ func _ready() -> void:
 	EventBus.agent_files_changed.connect(_on_files_changed)
 	EventBus.agent_git_status.connect(_on_git_status)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
+	skill_source_option.item_selected.connect(_on_skill_source_selected)
+	_populate_skill_source_options()
 	clear()
 
 
@@ -68,7 +72,7 @@ func _on_state_changed(agent_id: String, state: String) -> void:
 	if agent_id != _current_id:
 		return
 	state_label.text = state.capitalize()
-	state_label.modulate = CharacterView.STATE_COLORS.get(state, Color.WHITE).lerp(Color(1, 1, 1), 0.4)
+	state_label.modulate = CharacterAvatar.STATE_COLORS.get(state, Color.WHITE).lerp(Color(1, 1, 1), 0.4)
 	character_view.set_state(state)
 	var active := state in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval", "success"]
 	start_stop_button.text = "Stop" if active else "Start"
@@ -88,6 +92,7 @@ func _append_output(line: String) -> void:
 		output_log.clear()
 		for i in range(maxi(0, lines.size() - 400), lines.size()):
 			output_log.append_text(lines[i] + "\n")
+	output_scroll.scroll_vertical = int(output_scroll.get_v_scroll_bar().max_value)
 
 
 func _on_files_changed(agent_id: String, files: Array) -> void:
@@ -172,6 +177,17 @@ func _is_valid_dir(path: String) -> bool:
 	if expanded.begins_with("res://"):
 		return true
 	return DirAccess.dir_exists_absolute(expanded)
+
+
+func _populate_skill_source_options() -> void:
+	skill_source_option.clear()
+	skill_source_option.add_item("All Skills", 0)
+	skill_source_option.add_item("Global", 1)
+	skill_source_option.add_item("Local", 2)
+
+
+func _on_skill_source_selected(index: int) -> void:
+	pass
 
 
 func _on_temp_skill_pressed() -> void:

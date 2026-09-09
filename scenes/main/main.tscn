@@ -56,3 +56,46 @@ size_flags_stretch_ratio = 3.0
 [node name="AgentEditor" parent="." unique_id=609508433 instance=ExtResource("5_edit")]
 unique_name_in_owner = true
 layout_mode = 1
+
+[node name="LoadingOverlay" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+visible = false
+
+[node name="Dim" type="ColorRect" parent="LoadingOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Center" type="CenterContainer" parent="LoadingOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="VBoxContainer" parent="LoadingOverlay/Center"]
+layout_mode = 2
+
+[node name="LoadingLabel" type="Label" parent="LoadingOverlay/Center/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Loading..."
+horizontal_alignment = 1
+
+[node name="HintLabel" type="Label" parent="LoadingOverlay/Center/Box"]
+layout_mode = 2
+modulate = Color(0.7, 0.72, 0.78, 1)
+text = "Preparing models and skills..."
+horizontal_alignment = 1

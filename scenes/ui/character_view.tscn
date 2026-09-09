@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/character_view.gd" id="1_char"]
+[ext_resource type="Script" path="res://scripts/ui/character_avatar.gd" id="2_cavatar"]
 
 [node name="CharacterView" type="Control"]
 custom_minimum_size = Vector2(256, 300)
@@ -21,12 +22,11 @@ offset_bottom = -28.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Avatar" type="TextureRect" parent="Center"]
+[node name="Avatar" type="Control" parent="Center"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(256, 256)
 layout_mode = 2
-expand_mode = 1
-stretch_mode = 6
+script = ExtResource("2_cavatar")
 
 [node name="StateLabel" type="Label" parent="."]
 unique_name_in_owner = true
