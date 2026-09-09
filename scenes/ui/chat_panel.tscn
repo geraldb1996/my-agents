@@ -47,6 +47,17 @@ theme_override_font_sizes/font_size = 18
 text = "TEAM CHAT"
 size_flags_horizontal = 3
 
+[node name="AgentFilter" type="OptionButton" parent="Root/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+clip_text = true
+fit_to_longest_item = false
+custom_minimum_size = Vector2(90, 0)
+item_count = 1
+popup/item_0/text = "All agents"
+popup/item_0/id = 0
+selected = 0
+
 [node name="ClearButton" type="Button" parent="Root/Header"]
 unique_name_in_owner = true
 layout_mode = 2

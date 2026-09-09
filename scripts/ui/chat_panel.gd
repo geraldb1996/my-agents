@@ -20,17 +20,57 @@ const TYPING_STATES := ["thinking", "working", "reading", "coding", "terminal", 
 @onready var input_edit: LineEdit = %InputEdit
 
 var _typing: Dictionary = {}
+var _filter_name := ""
+var _opt_ids: Array[String] = []
 
 
 func _ready() -> void:
 	%SendButton.pressed.connect(_on_send_pressed)
 	%ClearButton.pressed.connect(_on_clear_pressed)
 	%ClearDialog.confirmed.connect(_on_clear_confirmed)
+	%AgentFilter.item_selected.connect(_on_filter_selected)
 	input_edit.text_submitted.connect(func(_t): _on_send_pressed())
 	EventBus.chat_message.connect(_on_chat_message)
 	EventBus.agent_state_changed.connect(_on_state_changed)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
+	EventBus.profile_saved.connect(_on_profile_saved)
+	_build_filter_options()
 	_populate_history()
+
+
+func _build_filter_options() -> void:
+	var keep_name := _filter_name
+	%AgentFilter.clear()
+	_opt_ids.clear()
+	_opt_ids.append("")
+	%AgentFilter.add_item("All agents")
+	for agent_id in ProfileStore.profiles:
+		var profile := ProfileStore.get_profile(agent_id)
+		if profile == null:
+			continue
+		_opt_ids.append(agent_id)
+		%AgentFilter.add_item(profile.name)
+	var idx := 0
+	for i in range(1, _opt_ids.size()):
+		var profile := ProfileStore.get_profile(_opt_ids[i])
+		if profile != null and profile.name == keep_name:
+			idx = i
+			break
+	%AgentFilter.select(idx)
+	_filter_name = "" if idx == 0 else %AgentFilter.get_item_text(idx)
+
+
+func _on_filter_selected(index: int) -> void:
+	_filter_name = "" if index <= 0 else %AgentFilter.get_item_text(index)
+	_populate_history()
+
+
+func _passes_filter(sender: String, is_agent: bool) -> bool:
+	if _filter_name.is_empty():
+		return true
+	if is_agent:
+		return sender == _filter_name
+	return sender == "user"
 
 
 func _on_clear_pressed() -> void:
@@ -44,13 +84,22 @@ func _on_clear_confirmed() -> void:
 
 
 func _populate_history() -> void:
+	for child in messages_box.get_children():
+		child.queue_free()
 	for msg in ProfileStore.chat_history:
 		if msg is Dictionary:
-			_add_bubble(str(msg.get("sender", "?")), str(msg.get("content", "")), int(msg.get("timestamp", 0)), bool(msg.get("is_agent", false)))
+			var sender := str(msg.get("sender", "?"))
+			var content := str(msg.get("content", ""))
+			var timestamp := int(msg.get("timestamp", 0))
+			var is_agent := bool(msg.get("is_agent", false))
+			if _passes_filter(sender, is_agent):
+				_add_bubble(sender, content, timestamp, is_agent)
 	_autoscroll()
 
 
 func _on_chat_message(sender: String, content: String, _mentions: Array, timestamp: int, is_agent: bool) -> void:
+	if not _passes_filter(sender, is_agent):
+		return
 	_add_bubble(sender, content, timestamp, is_agent)
 	_autoscroll()
 
@@ -194,7 +243,8 @@ func _route_message(text: String, mentions: Array) -> void:
 func _add_system_hint(content: String) -> void:
 	var ts := Time.get_unix_time_from_system() * 1000
 	ProfileStore.append_chat_message("system", content, [], ts, false)
-	_add_bubble("system", content, ts, false)
+	if _passes_filter("system", false):
+		_add_bubble("system", content, ts, false)
 
 
 func _on_state_changed(agent_id: String, state: String) -> void:
@@ -211,6 +261,14 @@ func _on_state_changed(agent_id: String, state: String) -> void:
 func _on_profile_deleted(agent_id: String) -> void:
 	_typing.erase(agent_id)
 	_update_typing_label()
+	_build_filter_options()
+	_populate_history()
+
+
+func _on_profile_saved(_profile: AgentProfile) -> void:
+	_build_filter_options()
+	if _filter_name.is_empty():
+		_populate_history()
 
 
 func _update_typing_label() -> void:
