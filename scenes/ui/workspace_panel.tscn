@@ -1,0 +1,163 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/workspace_panel.gd" id="1_ws"]
+[ext_resource type="PackedScene" path="res://scenes/ui/character_view.tscn" id="2_char"]
+
+[sub_resource type="StyleBoxFlat" id="sb_panel"]
+bg_color = Color(0.12, 0.13, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+
+[node name="WorkspacePanel" type="PanelContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("sb_panel")
+script = ExtResource("1_ws")
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Root/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "WORKSPACE"
+size_flags_horizontal = 3
+
+[node name="AgentNameLabel" type="Label" parent="Root/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.6, 0.65, 0.7, 1)
+text = "No agent selected"
+
+[node name="TaskRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="TaskEdit" type="LineEdit" parent="Root/TaskRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Task for agent..."
+
+[node name="SendButton" type="Button" parent="Root/TaskRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Send"
+
+[node name="StartStopButton" type="Button" parent="Root/TaskRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Start"
+
+[node name="ProjectRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="ProjectLabel" type="Label" parent="Root/ProjectRow"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.7, 0.7, 0.75, 1)
+text = "--"
+size_flags_horizontal = 3
+text_overrun_behavior = 3
+
+[node name="SelectProjectButton" type="Button" parent="Root/ProjectRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Select Folder"
+
+[node name="StateRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="StateLabel" type="Label" parent="Root/StateRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "--"
+
+[node name="TempSkillEdit" type="LineEdit" parent="Root/StateRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "temp skill..."
+
+[node name="TempSkillButton" type="Button" parent="Root/StateRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+Skill"
+
+[node name="CharacterView" parent="Root" instance=ExtResource("2_char")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="InfoRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="FilesBox" type="VBoxContainer" parent="Root/InfoRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FilesTitle" type="Label" parent="Root/InfoRow/FilesBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Files"
+
+[node name="FilesLabel" type="Label" parent="Root/InfoRow/FilesBox"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.75, 0.75, 0.8, 1)
+text = "--"
+
+[node name="GitBox" type="VBoxContainer" parent="Root/InfoRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GitTitle" type="Label" parent="Root/InfoRow/GitBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Git"
+
+[node name="GitLabel" type="Label" parent="Root/InfoRow/GitBox"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.75, 0.75, 0.8, 1)
+text = "--"
+
+[node name="OutputTitle" type="Label" parent="Root"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Output"
+
+[node name="OutputScroll" type="ScrollContainer" parent="Root"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="OutputLog" type="RichTextLabel" parent="Root/OutputScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+scroll_active = false
+bbcode_enabled = true
+text = ""
+
+[node name="ProjectDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+file_mode = 1
+access = 2
+title = "Select Project Folder"

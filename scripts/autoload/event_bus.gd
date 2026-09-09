@@ -1,0 +1,13 @@
+extends Node
+
+signal profile_saved(profile: AgentProfile)
+signal profile_deleted(agent_id: String)
+signal agent_selected(profile: AgentProfile)
+signal agent_started(agent_id: String)
+signal agent_stopped(agent_id: String)
+signal agent_state_changed(agent_id: String, state: String)
+signal agent_task_updated(agent_id: String, task: String)
+signal agent_output(agent_id: String, line: String)
+signal agent_files_changed(agent_id: String, files: Array)
+signal agent_git_status(agent_id: String, branch: String, status: String)
+signal chat_message(sender: String, content: String, mentions: Array, timestamp: int, is_agent: bool)

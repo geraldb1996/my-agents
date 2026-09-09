@@ -1,0 +1,200 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/agent_editor.gd" id="1_edit"]
+
+[sub_resource type="StyleBoxFlat" id="sb_overlay"]
+bg_color = Color(0, 0, 0, 0.65)
+
+[sub_resource type="StyleBoxFlat" id="sb_dialog"]
+bg_color = Color(0.16, 0.17, 0.21, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 16.0
+content_margin_top = 16.0
+content_margin_right = 16.0
+content_margin_bottom = 16.0
+
+[node name="AgentEditor" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_edit")
+
+[node name="Overlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.65)
+
+[node name="Dialog" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -320.0
+offset_right = 300.0
+offset_bottom = 320.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("sb_dialog")
+
+[node name="Form" type="VBoxContainer" parent="Dialog"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Agent Editor"
+
+[node name="NameLabel" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+text = "Name"
+
+[node name="NameEdit" type="LineEdit" parent="Dialog/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Godot Coder"
+
+[node name="ModelLabel" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+text = "Model (provider/model)"
+
+[node name="ModelRow" type="HBoxContainer" parent="Dialog/Form"]
+layout_mode = 2
+
+[node name="ModelSelect" type="OptionButton" parent="Dialog/Form/ModelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ModelRefreshButton" type="Button" parent="Dialog/Form/ModelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Refresh"
+
+[node name="ModelCustomEdit" type="LineEdit" parent="Dialog/Form"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+placeholder_text = "provider/model custom..."
+
+[node name="OpenCodeAgentLabel" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+text = "OpenCode agent (optional)"
+
+[node name="OpenCodeAgentEdit" type="LineEdit" parent="Dialog/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "e.g. build"
+
+[node name="PersonalityLabel" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+text = "Personality / System Prompt"
+
+[node name="PersonalityEdit" type="TextEdit" parent="Dialog/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SkillsLabel" type="Label" parent="Dialog/Form"]
+layout_mode = 2
+text = "Skills"
+
+[node name="SkillsBox" type="VBoxContainer" parent="Dialog/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="SkillAddRow" type="HBoxContainer" parent="Dialog/Form"]
+layout_mode = 2
+
+[node name="SkillInput" type="LineEdit" parent="Dialog/Form/SkillAddRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "skill name..."
+
+[node name="AddSkillButton" type="Button" parent="Dialog/Form/SkillAddRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Add"
+
+[node name="CharacterRow" type="HBoxContainer" parent="Dialog/Form"]
+layout_mode = 2
+
+[node name="CharacterLabel" type="Label" parent="Dialog/Form/CharacterRow"]
+layout_mode = 2
+text = "Character"
+
+[node name="CharacterPreview" type="TextureRect" parent="Dialog/Form/CharacterRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CharacterButton" type="Button" parent="Dialog/Form/CharacterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Select Image..."
+
+[node name="ProjectRow" type="HBoxContainer" parent="Dialog/Form"]
+layout_mode = 2
+
+[node name="ProjectLabel2" type="Label" parent="Dialog/Form/ProjectRow"]
+layout_mode = 2
+text = "Project"
+
+[node name="ProjectLabel" type="Label" parent="Dialog/Form/ProjectRow"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.7, 0.7, 0.75, 1)
+text = "--"
+size_flags_horizontal = 3
+text_overrun_behavior = 3
+
+[node name="ProjectButton" type="Button" parent="Dialog/Form/ProjectRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Select..."
+
+[node name="Actions" type="HBoxContainer" parent="Dialog/Form"]
+layout_mode = 2
+alignment = 2
+
+[node name="CancelButton" type="Button" parent="Dialog/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"
+
+[node name="SaveButton" type="Button" parent="Dialog/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Save"
+
+[node name="CharacterDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png ; PNG Images", "*.jpg, *.jpeg ; JPEG Images", "*.webp ; WebP Images")
+title = "Select Character Image"
+
+[node name="ProjectDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+file_mode = 1
+access = 2
+title = "Select Project Folder"

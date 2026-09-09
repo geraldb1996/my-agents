@@ -1,0 +1,68 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
+
+[sub_resource type="StyleBoxFlat" id="sb_panel"]
+bg_color = Color(0.12, 0.13, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+
+[node name="ChatPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(340, 0)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("sb_panel")
+script = ExtResource("1_chat")
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Root/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "TEAM CHAT"
+size_flags_horizontal = 3
+
+[node name="Scroll" type="ScrollContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MessagesBox" type="VBoxContainer" parent="Root/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TypingLabel" type="Label" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.6, 0.65, 0.7, 1)
+visible = false
+text = ""
+
+[node name="InputRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="InputEdit" type="LineEdit" parent="Root/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Message... use @Agent or @all"
+
+[node name="SendButton" type="Button" parent="Root/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Send"

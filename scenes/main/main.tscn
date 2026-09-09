@@ -1,0 +1,58 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/ui/agents_panel.tscn" id="2_agents"]
+[ext_resource type="PackedScene" path="res://scenes/ui/workspace_panel.tscn" id="3_ws"]
+[ext_resource type="PackedScene" path="res://scenes/ui/chat_panel.tscn" id="4_chat"]
+[ext_resource type="PackedScene" path="res://scenes/ui/agent_editor.tscn" id="5_edit"]
+
+[sub_resource type="StyleBoxFlat" id="sb_bg"]
+bg_color = Color(0.09, 0.095, 0.12, 1)
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.095, 0.12, 1)
+
+[node name="Panels" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+
+[node name="AgentsPanel" parent="Panels" instance=ExtResource("2_agents")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WorkspacePanel" parent="Panels" instance=ExtResource("3_ws")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ChatPanel" parent="Panels" instance=ExtResource("4_chat")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="AgentEditor" parent="." instance=ExtResource("5_edit")]
+unique_name_in_owner = true
+layout_mode = 1
