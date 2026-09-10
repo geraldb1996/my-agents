@@ -22,6 +22,8 @@ const TYPING_STATES := ["thinking", "working", "reading", "coding", "terminal", 
 var _typing: Dictionary = {}
 var _filter_name := ""
 var _opt_ids: Array[String] = []
+var _copy_menu: PopupMenu
+var _copy_content := ""
 
 
 func _ready() -> void:
@@ -164,6 +166,7 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 
 	bubble.add_child(inner)
 	row.add_child(bubble)
+	bubble.gui_input.connect(_on_bubble_gui_input.bind(content))
 
 	if not is_user:
 		var spacer_right := Control.new()
@@ -171,6 +174,25 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 		row.add_child(spacer_right)
 
 	messages_box.add_child(row)
+
+
+func _on_bubble_gui_input(event: InputEvent, content: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		_copy_content = content
+		_show_copy_menu()
+
+
+func _show_copy_menu() -> void:
+	if _copy_menu == null:
+		_copy_menu = PopupMenu.new()
+		_copy_menu.add_item("Copy message")
+		_copy_menu.id_pressed.connect(_on_copy_id)
+		add_child(_copy_menu)
+	_copy_menu.popup(Rect2i(Vector2i(get_viewport().get_mouse_position()), Vector2i()))
+
+
+func _on_copy_id(_id: int) -> void:
+	DisplayServer.clipboard_set(_copy_content)
 
 
 func _on_send_pressed() -> void:

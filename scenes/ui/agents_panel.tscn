@@ -59,16 +59,31 @@ Create one with + New."
 [node name="ContextMenu" type="PopupMenu" parent="." unique_id=1148466266]
 unique_name_in_owner = true
 oversampling_override = 1.0
-size = Vector2i(145, 100)
-item_count = 3
-item_0/text = "Reset Session"
+size = Vector2i(180, 140)
+item_count = 7
+item_0/text = "New Session"
 item_0/id = 0
-item_1/text = "Edit"
-item_1/id = 1
-item_2/text = "Delete"
-item_2/id = 2
+item_1/text = "Previous Sessions"
+item_2/text = "Delete Session"
+item_2/id = 1
+item_3/text = "Model"
+item_4/text = "Variant"
+item_5/text = "Edit Agent"
+item_5/id = 2
+item_6/text = "Delete Agent"
+item_6/id = 3
 
-[node name="VariantMenu" type="PopupMenu" parent="." unique_id=537188366]
+[node name="ModelMenu" type="PopupMenu" parent="ContextMenu" unique_id=741002001]
+unique_name_in_owner = true
+oversampling_override = 1.0
+title = "Model"
+
+[node name="VariantMenu" type="PopupMenu" parent="ContextMenu" unique_id=741002002]
 unique_name_in_owner = true
 oversampling_override = 1.0
 title = "Variant"
+
+[node name="SessionMenu" type="PopupMenu" parent="ContextMenu" unique_id=741002003]
+unique_name_in_owner = true
+oversampling_override = 1.0
+title = "Previous Sessions"

@@ -36,7 +36,12 @@ func _ready() -> void:
 	EventBus.agent_context_usage.connect(_on_context_usage)
 	%NewButton.pressed.connect(_on_new_pressed)
 	%ContextMenu.id_pressed.connect(_on_context_menu_pressed)
+	%ModelMenu.id_pressed.connect(_on_model_menu_pressed)
 	%VariantMenu.id_pressed.connect(_on_variant_menu_pressed)
+	%SessionMenu.id_pressed.connect(_on_session_menu_pressed)
+	%ContextMenu.set_item_submenu(1, "SessionMenu")
+	%ContextMenu.set_item_submenu(3, "ModelMenu")
+	%ContextMenu.set_item_submenu(4, "VariantMenu")
 	refresh()
 
 
@@ -120,31 +125,6 @@ func _build_card(profile: AgentProfile) -> Control:
 	info.add_child(context_row)
 	row.add_child(info)
 
-	var actions := VBoxContainer.new()
-	actions.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var start_button := Button.new()
-	start_button.name = "StartButton"
-	start_button.text = "Start"
-	start_button.custom_minimum_size = Vector2(56, 28)
-	start_button.pressed.connect(_on_start_pressed.bind(profile.id, start_button))
-	actions.add_child(start_button)
-	var ses_button := Button.new()
-	ses_button.text = "Ses"
-	ses_button.custom_minimum_size = Vector2(56, 28)
-	ses_button.tooltip_text = "Reset session"
-	ses_button.pressed.connect(_on_ses_pressed.bind(profile.id))
-	actions.add_child(ses_button)
-	var var_button := Button.new()
-	var_button.text = "Var"
-	var_button.custom_minimum_size = Vector2(56, 28)
-	var_button.tooltip_text = "Model variant"
-	var_button.pressed.connect(_on_var_pressed.bind(profile.id, var_button))
-	var variants := ModelCatalog.get_variants(profile.model)
-	var_button.disabled = variants.is_empty()
-	actions.add_child(var_button)
-	row.add_child(actions)
-
-	card.set_meta("start_button", start_button)
 	card.set_meta("state_label", state_label)
 	card.set_meta("context_bar", context_bar)
 	card.set_meta("context_pct", context_pct)
@@ -163,12 +143,80 @@ func _on_card_input(event: InputEvent, agent_id: String) -> void:
 
 
 var _context_target: String = ""
-var _variant_target: String = ""
+var _menu_models: Array[String] = []
+var _menu_variants: Array[String] = []
+var _menu_sessions: Array[String] = []
 
 
 func _open_context_menu(agent_id: String, at_position: Vector2) -> void:
+	var profile := ProfileStore.get_profile(agent_id)
+	if profile == null:
+		return
 	_context_target = agent_id
+	_populate_model_menu(profile)
+	_populate_variant_menu(profile)
+	_populate_session_menu(agent_id)
 	%ContextMenu.popup(Rect2i(at_position, Vector2(200, 0)))
+
+
+func _populate_model_menu(profile: AgentProfile) -> void:
+	_menu_models.clear()
+	%ModelMenu.clear()
+	_menu_models.append("")
+	%ModelMenu.add_item("Default (auto)", 0)
+	if profile.model.is_empty():
+		%ModelMenu.set_item_checked(0, true)
+	for i in ModelCatalog.models.size():
+		var model := ModelCatalog.models[i]
+		var id := i + 1
+		_menu_models.append(model)
+		%ModelMenu.add_item(model, id)
+		if model == profile.model:
+			%ModelMenu.set_item_checked(id, true)
+
+
+func _populate_variant_menu(profile: AgentProfile) -> void:
+	_menu_variants.clear()
+	%VariantMenu.clear()
+	var variants := ModelCatalog.get_variants(profile.model)
+	%ContextMenu.set_item_disabled(4, variants.is_empty())
+	if variants.is_empty():
+		%VariantMenu.add_item("No variants", 0)
+		return
+	_menu_variants.append("")
+	%VariantMenu.add_item("Default (none)", 0)
+	if profile.model_variant.is_empty():
+		%VariantMenu.set_item_checked(0, true)
+	for i in variants.size():
+		var variant := str(variants[i])
+		var id := i + 1
+		_menu_variants.append(variant)
+		%VariantMenu.add_item(variant, id)
+		if variant == profile.model_variant:
+			%VariantMenu.set_item_checked(id, true)
+
+
+func _populate_session_menu(agent_id: String) -> void:
+	_menu_sessions.clear()
+	%SessionMenu.clear()
+	var history := ProfileStore.load_session_history(agent_id)
+	if history.is_empty():
+		%SessionMenu.add_item("No previous sessions", 0)
+		return
+	var active := str(AgentManager.get_session(agent_id).get("opencode_session", ""))
+	for entry in history:
+		if entry is not Dictionary:
+			continue
+		var sid := str(entry.get("opencode_session", ""))
+		if sid.is_empty():
+			continue
+		_menu_sessions.append(sid)
+		var id := _menu_sessions.size() - 1
+		var archived := int(entry.get("archived_at", 0))
+		var label := "%s · %s" % [sid.right(10), Time.get_datetime_string_from_unix_time(archived)]
+		%SessionMenu.add_item(label, id)
+		if sid == active:
+			%SessionMenu.set_item_checked(id, true)
 
 
 func _on_context_menu_pressed(index: int) -> void:
@@ -176,46 +224,30 @@ func _on_context_menu_pressed(index: int) -> void:
 		return
 	match index:
 		0:
-			AgentManager.reset_session(_context_target)
+			AgentManager.new_session(_context_target)
 		1:
-			edit_agent_requested.emit(_context_target)
+			AgentManager.delete_session(_context_target)
 		2:
+			edit_agent_requested.emit(_context_target)
+		3:
 			delete_agent_requested.emit(_context_target)
 
-
-func _on_ses_pressed(agent_id: String) -> void:
-	AgentManager.reset_session(agent_id)
-
-
-func _on_var_pressed(agent_id: String, button: Button) -> void:
-	var profile := ProfileStore.get_profile(agent_id)
-	if profile == null:
+func _on_session_menu_pressed(index: int) -> void:
+	if _context_target.is_empty() or index >= _menu_sessions.size():
 		return
-	var variants := ModelCatalog.get_variants(profile.model)
-	if variants.is_empty():
+	AgentManager.switch_session(_context_target, _menu_sessions[index])
+
+
+func _on_model_menu_pressed(index: int) -> void:
+	if _context_target.is_empty() or index >= _menu_models.size():
 		return
-	_variant_target = agent_id
-	%VariantMenu.clear()
-	%VariantMenu.add_item("Default (none)", 0)
-	var current := profile.model_variant
-	for v in variants:
-		%VariantMenu.add_item(str(v))
-		if str(v) == current:
-			%VariantMenu.set_item_checked(%VariantMenu.item_count - 1, true)
-	%VariantMenu.add_item("Custom...", -1)
-	%VariantMenu.popup(Rect2i(button.global_position + Vector2(0, button.size.y), Vector2(180, 0)))
+	AgentManager.set_model(_context_target, _menu_models[index])
 
 
 func _on_variant_menu_pressed(index: int) -> void:
-	if _variant_target.is_empty():
+	if _context_target.is_empty() or index >= _menu_variants.size():
 		return
-	var variant := ""
-	if index > 0:
-		var custom_idx: int = %VariantMenu.item_count - 1
-		if index == custom_idx:
-			return
-		variant = %VariantMenu.get_item_text(index)
-	AgentManager.set_variant(_variant_target, variant)
+	AgentManager.set_variant(_context_target, _menu_variants[index])
 
 
 func _select(agent_id: String) -> void:
@@ -236,24 +268,6 @@ func _apply_selection_highlight(agent_id: String) -> void:
 			card.add_theme_stylebox_override("panel", sb)
 		else:
 			card.remove_theme_stylebox_override("panel")
-
-
-func _on_start_pressed(agent_id: String, button: Button) -> void:
-	var state := _get_state(agent_id)
-	if state in ["offline", "idle", "error"]:
-		AgentManager.start_agent(agent_id)
-		button.text = "Stop"
-	else:
-		AgentManager.stop_agent(agent_id)
-		button.text = "Start"
-
-
-func _on_edit_pressed(agent_id: String) -> void:
-	edit_agent_requested.emit(agent_id)
-
-
-func _on_delete_pressed(agent_id: String) -> void:
-	delete_agent_requested.emit(agent_id)
 
 
 func _on_new_pressed() -> void:
@@ -283,10 +297,8 @@ func _update_card_state(agent_id: String, state: String) -> void:
 	if card == null:
 		return
 	var state_label: Label = card.get_meta("state_label")
-	var start_button: Button = card.get_meta("start_button")
 	var avatar: CharacterAvatar = card.get_meta("avatar")
 	state_label.text = STATE_LABELS.get(state, state.capitalize())
-	start_button.text = "Stop" if state in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval", "success"] else "Start"
 	avatar.set_state(state)
 
 
@@ -294,21 +306,24 @@ func _get_state(agent_id: String) -> String:
 	return str(AgentManager.get_session(agent_id).get("state", "offline"))
 
 
-func _on_context_usage(agent_id: String, percent: float, tokens: int) -> void:
+func _on_context_usage(agent_id: String, tokens: int, percent: float, cost: float) -> void:
 	var card: Control = _cards.get(agent_id)
 	if card == null:
 		return
 	var bar: ProgressBar = card.get_meta("context_bar")
 	var pct_label: Label = card.get_meta("context_pct")
 	bar.value = percent
-	pct_label.text = "%d%% %s" % [int(percent), _fmt_tokens(tokens)]
+	pct_label.text = "%d%% · %s · $%.2f" % [int(percent), _fmt_tokens(tokens), cost]
 	_update_bar_color(bar, percent)
 
 
 func _fmt_tokens(n: int) -> String:
-	if n >= 1000:
-		return "%.1fk" % (n / 1000.0)
-	return str(n)
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out
 
 
 func _context_bar_bg() -> StyleBoxFlat:

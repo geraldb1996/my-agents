@@ -1,32 +1,31 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://cn1mkwnr8t2gq"]
 
-[ext_resource type="Script" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
+[ext_resource type="Script" uid="uid://bxtq70oyut3dv" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
 
 [sub_resource type="StyleBoxFlat" id="sb_panel"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
 bg_color = Color(0.12, 0.13, 0.16, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
 
 [sub_resource type="StyleBoxFlat" id="sb_scroll"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
 bg_color = Color(0.07, 0.075, 0.09, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
-content_margin_left = 6.0
-content_margin_top = 6.0
-content_margin_right = 6.0
-content_margin_bottom = 6.0
 
-[node name="ChatPanel" type="PanelContainer"]
+[node name="ChatPanel" type="PanelContainer" unique_id=482658913]
 custom_minimum_size = Vector2(340, 0)
-layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -35,72 +34,70 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("sb_panel")
 script = ExtResource("1_chat")
 
-[node name="Root" type="VBoxContainer" parent="."]
+[node name="Root" type="VBoxContainer" parent="." unique_id=431668118]
 layout_mode = 2
 
-[node name="Header" type="HBoxContainer" parent="Root"]
+[node name="Header" type="HBoxContainer" parent="Root" unique_id=1109010820]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="Root/Header"]
+[node name="Title" type="Label" parent="Root/Header" unique_id=1893604940]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 18
 text = "TEAM CHAT"
-size_flags_horizontal = 3
 
-[node name="AgentFilter" type="OptionButton" parent="Root/Header"]
+[node name="AgentFilter" type="OptionButton" parent="Root/Header" unique_id=47933165]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 clip_text = true
-fit_to_longest_item = false
-custom_minimum_size = Vector2(90, 0)
-item_count = 1
-popup/item_0/text = "All agents"
-popup/item_0/id = 0
 selected = 0
+fit_to_longest_item = false
+item_count = 1
+popup/item_0/text = "All"
+popup/item_0/id = 0
 
-[node name="ClearButton" type="Button" parent="Root/Header"]
+[node name="ClearButton" type="Button" parent="Root/Header" unique_id=277810079]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Clear All"
 
-[node name="ScrollPanel" type="PanelContainer" parent="Root"]
+[node name="ScrollPanel" type="PanelContainer" parent="Root" unique_id=1016154770]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("sb_scroll")
 
-[node name="Scroll" type="ScrollContainer" parent="Root/ScrollPanel"]
+[node name="Scroll" type="ScrollContainer" parent="Root/ScrollPanel" unique_id=657211153]
 unique_name_in_owner = true
 layout_mode = 2
 horizontal_scroll_mode = 0
-vertical_scroll_mode = 1
 
-[node name="MessagesBox" type="VBoxContainer" parent="Root/ScrollPanel/Scroll"]
+[node name="MessagesBox" type="VBoxContainer" parent="Root/ScrollPanel/Scroll" unique_id=1190100221]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TypingLabel" type="Label" parent="Root"]
+[node name="TypingLabel" type="Label" parent="Root" unique_id=1673171444]
 unique_name_in_owner = true
-layout_mode = 2
-modulate = Color(0.6, 0.65, 0.7, 1)
 visible = false
-text = ""
-
-[node name="InputRow" type="HBoxContainer" parent="Root"]
+modulate = Color(0.6, 0.65, 0.7, 1)
 layout_mode = 2
 
-[node name="InputEdit" type="LineEdit" parent="Root/InputRow"]
+[node name="InputRow" type="HBoxContainer" parent="Root" unique_id=1158968561]
+layout_mode = 2
+
+[node name="InputEdit" type="LineEdit" parent="Root/InputRow" unique_id=80876458]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Message... use @Agent or @all"
 
-[node name="SendButton" type="Button" parent="Root/InputRow"]
+[node name="SendButton" type="Button" parent="Root/InputRow" unique_id=1419655009]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Send"
 
-[node name="ClearDialog" type="ConfirmationDialog" parent="."]
+[node name="ClearDialog" type="ConfirmationDialog" parent="." unique_id=1963547024]
 unique_name_in_owner = true
 title = "Clear chat history"
 dialog_text = "Delete all chat messages? This cannot be undone."

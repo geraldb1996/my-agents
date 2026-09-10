@@ -109,6 +109,20 @@ func delete_session(agent_id: String) -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
+func load_session_history(agent_id: String) -> Array:
+	var path := SESSIONS_DIR.path_join(agent_id + ".history.json")
+	var text := _read_text(path)
+	if text.is_empty():
+		return []
+	var parsed = JSON.parse_string(text)
+	return parsed if parsed is Array else []
+
+
+func save_session_history(agent_id: String, history: Array) -> void:
+	var path := SESSIONS_DIR.path_join(agent_id + ".history.json")
+	_write_text(path, JSON.stringify(history, "\t"))
+
+
 func _read_text(path: String) -> String:
 	if not FileAccess.file_exists(path):
 		return ""

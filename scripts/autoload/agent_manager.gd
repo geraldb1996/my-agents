@@ -22,8 +22,6 @@ const TASK_NO_PROJECT := 1
 const TASK_BUSY := 2
 const TASK_LAUNCH_FAILED := 3
 
-const CONTEXT_LIMIT := 200000
-
 var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
@@ -31,6 +29,7 @@ var _runners: Dictionary = {}
 var _pending_thinking: Dictionary = {}
 var _pending_response: Dictionary = {}
 var _posted_reply: Dictionary = {}
+var _last_error: Dictionary = {}
 var _git_refresh_queue: Dictionary = {}
 var _git_timers: Dictionary = {}
 
@@ -112,7 +111,38 @@ func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, "[Team chat] %s" % content)
 
 
-func reset_session(agent_id: String) -> void:
+func delete_session(agent_id: String) -> void:
+	_detach_runner(agent_id)
+	emit_output(agent_id, "[session] deleted — next task starts fresh")
+	set_state(agent_id, "offline")
+
+
+func new_session(agent_id: String) -> void:
+	_archive_session(agent_id)
+	_detach_runner(agent_id)
+	emit_output(agent_id, "[session] new session — previous kept in history")
+	set_state(agent_id, "offline")
+
+
+func switch_session(agent_id: String, opencode_session_id: String) -> void:
+	if opencode_session_id.is_empty():
+		return
+	_archive_session(agent_id)
+	_detach_runner(agent_id)
+	var history := ProfileStore.load_session_history(agent_id)
+	var filtered: Array = []
+	for entry in history:
+		if str(entry.get("opencode_session", "")) != opencode_session_id:
+			filtered.append(entry)
+	ProfileStore.save_session_history(agent_id, filtered)
+	var session := get_session(agent_id)
+	session["opencode_session"] = opencode_session_id
+	ProfileStore.save_session(agent_id, session)
+	emit_output(agent_id, "[session] switched to %s" % opencode_session_id)
+	set_state(agent_id, "offline")
+
+
+func _detach_runner(agent_id: String) -> void:
 	var runner: OpenCodeRunner = _runners.get(agent_id)
 	if runner != null and runner.running:
 		runner.stop()
@@ -122,8 +152,36 @@ func reset_session(agent_id: String) -> void:
 	_pending_thinking.erase(agent_id)
 	_pending_response.erase(agent_id)
 	_posted_reply.erase(agent_id)
-	emit_output(agent_id, "[session] reset — next task starts fresh")
-	set_state(agent_id, "offline")
+	_last_error.erase(agent_id)
+
+
+func _archive_session(agent_id: String) -> void:
+	var sid := str(get_session(agent_id).get("opencode_session", ""))
+	if sid.is_empty():
+		return
+	var history := ProfileStore.load_session_history(agent_id)
+	for entry in history:
+		if str(entry.get("opencode_session", "")) == sid:
+			return
+	history.append({
+		"opencode_session": sid,
+		"archived_at": Time.get_unix_time_from_system(),
+	})
+	ProfileStore.save_session_history(agent_id, history)
+
+
+func set_model(agent_id: String, model: String) -> void:
+	var profile := get_profile(agent_id)
+	if profile == null:
+		return
+	profile.model = model
+	profile.model_variant = ""
+	ProfileStore.save_profile(profile)
+	if model.is_empty():
+		emit_output(agent_id, "[model] default (auto)")
+	else:
+		emit_output(agent_id, "[model] %s" % model)
+	EventBus.profile_saved.emit(profile)
 
 
 func set_variant(agent_id: String, variant: String) -> void:
@@ -180,6 +238,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 	runner.name = "Runner_%s" % agent_id
 	add_child(runner)
 	_runners[agent_id] = runner
+	_last_error.erase(agent_id)
 
 	var started := runner.start({
 		"agent_id": agent_id,
@@ -211,7 +270,11 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 		_runners.erase(agent_id)
 		runner.queue_free()
 	if exit_code != 0:
-		emit_chat_error(agent_id, "Process exited with code %d" % exit_code)
+		var message := str(_last_error.get(agent_id, ""))
+		_last_error.erase(agent_id)
+		if message.is_empty():
+			message = "Process exited with code %d" % exit_code
+		emit_chat_error(agent_id, message)
 		set_state(agent_id, "error")
 	else:
 		if not _posted_reply.get(agent_id, false):
@@ -246,7 +309,14 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 			if str(part.get("type", "")) == "text":
 				var text: String = str(part.get("text", ""))
 				if not text.is_empty():
-					_pending_response[agent_id] = _pending_response.get(agent_id, "") + text
+					var parts: Dictionary = _pending_response.get(agent_id, {})
+					var mid: String = str(part.get("messageID", ""))
+					var prev: String = str(parts.get(mid, ""))
+					if not prev.is_empty() and not text.begins_with(prev):
+						parts[mid] = prev + text
+					else:
+						parts[mid] = text
+					_pending_response[agent_id] = parts
 		"tool_use":
 			if str(part.get("type", "")) == "tool":
 				_handle_tool(agent_id, part)
@@ -257,22 +327,53 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 			else:
 				set_state(agent_id, "working")
 		_:
-			if etype.contains("permission"):
+			if etype == "stderr":
+				emit_output(agent_id, "[stderr] " + str(event.get("line", "")))
+			elif etype == "error":
+				_capture_error(agent_id, event)
+			elif etype.contains("permission"):
 				set_state(agent_id, "approval")
+
+
+func _capture_error(agent_id: String, event: Dictionary) -> void:
+	var error: Variant = event.get("error", {})
+	if error is not Dictionary:
+		error = {"message": str(error)}
+	var data: Variant = error.get("data", {})
+	if data is not Dictionary:
+		data = {}
+	var message := str(data.get("message", ""))
+	if message.is_empty():
+		message = str(error.get("message", ""))
+	var name := str(error.get("name", ""))
+	if not message.is_empty() and not name.is_empty() and not message.begins_with(name):
+		message = "%s: %s" % [name, message]
+	if message.is_empty():
+		message = name if not name.is_empty() else "Unknown OpenCode error"
+	_last_error[agent_id] = message
 
 
 func _emit_context_usage(agent_id: String, part: Dictionary) -> void:
 	var tokens: Dictionary = part.get("tokens", {})
 	if tokens is not Dictionary:
 		tokens = {}
-	var input_tokens := int(tokens.get("input", 0))
-	var cache_read := 0
 	var cache: Variant = tokens.get("cache", {})
-	if cache is Dictionary:
-		cache_read = int(cache.get("read", 0))
-	var context_tokens := input_tokens + cache_read
-	var pct := clampf(float(context_tokens) / float(CONTEXT_LIMIT) * 100.0, 0.0, 100.0)
-	EventBus.agent_context_usage.emit(agent_id, pct, context_tokens)
+	if cache is not Dictionary:
+		cache = {}
+	var output_tokens := int(tokens.get("output", 0))
+	if output_tokens <= 0:
+		return
+	var context_tokens := int(tokens.get("input", 0)) + output_tokens + int(tokens.get("reasoning", 0)) + int(cache.get("read", 0)) + int(cache.get("write", 0))
+	var profile := get_profile(agent_id)
+	var limit := 0
+	if profile != null:
+		limit = ModelCatalog.get_context_limit(profile.model)
+	var pct := 0.0
+	if limit > 0:
+		pct = minf(roundf(float(context_tokens) / float(limit) * 100.0), 100.0)
+	var session := get_session(agent_id)
+	session["cost_spent"] = float(session.get("cost_spent", 0.0)) + float(part.get("cost", 0.0))
+	EventBus.agent_context_usage.emit(agent_id, context_tokens, pct, float(session["cost_spent"]))
 
 
 func _handle_tool(agent_id: String, part: Dictionary) -> void:
@@ -331,9 +432,13 @@ func _finish_task(agent_id: String) -> void:
 func _post_reply(agent_id: String) -> void:
 	if _posted_reply.get(agent_id, false):
 		return
-	var reply: String = _pending_response.get(agent_id, "").strip_edges()
-	_pending_response[agent_id] = ""
+	var reply := ""
+	var parts: Dictionary = _pending_response.get(agent_id, {})
+	for mid in parts:
+		reply = str(parts[mid])
+	_pending_response[agent_id] = {}
 	_pending_thinking.erase(agent_id)
+	reply = reply.strip_edges()
 	if reply.is_empty():
 		return
 	_posted_reply[agent_id] = true

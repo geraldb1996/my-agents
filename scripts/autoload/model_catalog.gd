@@ -4,6 +4,7 @@ signal models_loaded
 
 var models: Array[String] = []
 var model_variants: Dictionary = {}
+var model_limits: Dictionary = {}
 var loaded_once: bool = false
 var loading: bool = false
 
@@ -46,8 +47,13 @@ func get_variants(model_id: String) -> Array:
 	return v if v is Array else []
 
 
+func get_context_limit(model_id: String) -> int:
+	return int(model_limits.get(model_id, 0))
+
+
 func _load_variants() -> void:
 	model_variants.clear()
+	model_limits.clear()
 	var output: Array = []
 	var err := OS.execute("opencode", ["models", "--verbose"], output, true, false)
 	if err != OK:
@@ -64,7 +70,7 @@ func _load_variants() -> void:
 		if current_model.is_empty() and not s.begins_with("{") and not s.begins_with("\"") and s.find("/") != -1:
 			current_model = s
 			continue
-		if s.begins_with("{"):
+		if depth == 0 and s.begins_with("{"):
 			depth = s.count("{") - s.count("}")
 			block = PackedStringArray([ln])
 			continue
@@ -85,6 +91,9 @@ func _finish_variant_block(model_id: String, block: PackedStringArray) -> void:
 		var v: Dictionary = parsed.get("variants", {})
 		if v is Dictionary and not v.is_empty():
 			model_variants[model_id] = v.keys()
+		var limit: Dictionary = parsed.get("limit", {})
+		if limit is Dictionary and not limit.is_empty():
+			model_limits[model_id] = int(limit.get("context", 0))
 
 
 func _collect_models(output: Array) -> void:

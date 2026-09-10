@@ -16,8 +16,11 @@ var running: bool = false
 
 var _pid: int = -1
 var _out_path: String = ""
+var _err_path: String = ""
 var _buffer: String = ""
+var _err_buffer: String = ""
 var _last_text: String = ""
+var _last_err: String = ""
 var _completed_ok: bool = false
 var _stopped_by_user: bool = false
 
@@ -49,17 +52,21 @@ func start(opts: Dictionary) -> bool:
 
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://tmp"))
 	_out_path = "user://tmp/%s.out" % agent_id
+	_err_path = "user://tmp/%s.err" % agent_id
 	var out := ProjectSettings.globalize_path(_out_path)
+	var err := ProjectSettings.globalize_path(_err_path)
 	var quoted: Array[String] = []
 	for a in args:
 		quoted.append(_shell_quote(a))
-	var shell_cmd := "exec opencode %s > %s 2>&1" % [" ".join(quoted), _shell_quote(out)]
+	var shell_cmd := "exec opencode %s > %s 2> %s" % [" ".join(quoted), _shell_quote(out), _shell_quote(err)]
 	_pid = OS.create_process("bash", ["-c", shell_cmd], false)
 	if _pid <= 0:
 		return false
 
 	_buffer = ""
+	_err_buffer = ""
 	_last_text = ""
+	_last_err = ""
 	_completed_ok = false
 	_stopped_by_user = false
 	running = true
@@ -78,22 +85,31 @@ func stop() -> void:
 func poll() -> void:
 	if not running:
 		return
-	var file := FileAccess.open(_out_path, FileAccess.READ)
-	if file != null:
-		var text := _read_file(file)
-		file.close()
-		if text.begins_with(_last_text):
-			var new_part := text.substr(_last_text.length())
-			_last_text = text
-			_buffer += new_part
-		else:
-			_last_text = text
-			_buffer = ""
-		_consume_lines()
+	_drain_stream(_out_path, false)
+	_drain_stream(_err_path, true)
 
 	if _pid > 0 and not OS.is_process_running(_pid):
 		running = false
 		process_finished.emit(agent_id, 0 if _completed_ok else -1)
+
+
+func _drain_stream(path: String, is_stderr: bool) -> void:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return
+	var text := _read_file(file)
+	file.close()
+	var buffer := ""
+	if is_stderr:
+		if text.begins_with(_last_err):
+			buffer = _err_buffer + text.substr(_last_err.length())
+		_last_err = text
+		_err_buffer = _consume_lines(buffer, true)
+	else:
+		if text.begins_with(_last_text):
+			buffer = _buffer + text.substr(_last_text.length())
+		_last_text = text
+		_buffer = _consume_lines(buffer, false)
 
 
 func _read_file(file: FileAccess) -> String:
@@ -113,14 +129,18 @@ func _build_prompt() -> String:
 	return "\n".join(parts)
 
 
-func _consume_lines() -> void:
-	while _buffer.contains("\n"):
-		var idx := _buffer.find("\n")
-		var line := _buffer.substr(0, idx).strip_edges()
-		_buffer = _buffer.substr(idx + 1)
+func _consume_lines(buffer: String, is_stderr: bool) -> String:
+	while buffer.contains("\n"):
+		var idx := buffer.find("\n")
+		var line := buffer.substr(0, idx).strip_edges()
+		buffer = buffer.substr(idx + 1)
 		if line.is_empty():
 			continue
-		_parse_line(line)
+		if is_stderr:
+			event_received.emit(agent_id, {"type": "stderr", "line": line})
+		else:
+			_parse_line(line)
+	return buffer
 
 
 func _shell_quote(s: String) -> String:
@@ -128,6 +148,8 @@ func _shell_quote(s: String) -> String:
 
 
 func _parse_line(line: String) -> void:
+	if not line.begins_with("{"):
+		return
 	var parsed = JSON.parse_string(line)
 	if parsed is Dictionary:
 		var event: Dictionary = parsed
