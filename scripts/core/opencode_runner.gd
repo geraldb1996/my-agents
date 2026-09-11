@@ -5,6 +5,7 @@ signal event_received(agent_id: String, event: Dictionary)
 signal process_finished(agent_id: String, exit_code: int)
 
 var agent_id: String = ""
+var agent_name: String = ""
 var project: String = ""
 var model: String = ""
 var variant: String = ""
@@ -27,6 +28,7 @@ var _stopped_by_user: bool = false
 
 func start(opts: Dictionary) -> bool:
 	agent_id = str(opts.get("agent_id", ""))
+	agent_name = str(opts.get("agent_name", ""))
 	project = str(opts.get("project", ""))
 	model = str(opts.get("model", ""))
 	variant = str(opts.get("variant", ""))
@@ -120,7 +122,8 @@ func _read_file(file: FileAccess) -> String:
 func _build_prompt() -> String:
 	var parts: Array[String] = []
 	if session_id.is_empty():
-		var intro := "You are %s, an AI agent in a team working through OpenCode CLI." % agent_id
+		var display_name := agent_name if not agent_name.is_empty() else agent_id
+		var intro := "You are %s, an AI agent in a team working through OpenCode CLI." % display_name
 		parts.append(intro)
 		if not skills_context.is_empty():
 			parts.append("Your skills: %s" % skills_context)

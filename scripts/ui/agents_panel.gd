@@ -213,8 +213,14 @@ func _populate_session_menu(agent_id: String) -> void:
 		_menu_sessions.append(sid)
 		var id := _menu_sessions.size() - 1
 		var archived := int(entry.get("archived_at", 0))
-		var label := "%s · %s" % [sid.right(10), Time.get_datetime_string_from_unix_time(archived)]
+		var title := str(entry.get("title", ""))
+		if title.is_empty():
+			title = AgentManager.get_session_title(sid)
+		if title.is_empty():
+			title = sid.right(10)
+		var label := "%s · %s" % [title, Time.get_datetime_string_from_unix_time(archived)]
 		%SessionMenu.add_item(label, id)
+		%SessionMenu.set_item_tooltip(id, sid)
 		if sid == active:
 			%SessionMenu.set_item_checked(id, true)
 

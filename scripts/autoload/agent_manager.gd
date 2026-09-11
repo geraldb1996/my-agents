@@ -26,6 +26,9 @@ var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
 var _runners: Dictionary = {}
+var _output_history: Dictionary = {}
+var _session_titles: Dictionary = {}
+var _session_titles_loaded_at: float = -1.0
 var _pending_thinking: Dictionary = {}
 var _pending_response: Dictionary = {}
 var _posted_reply: Dictionary = {}
@@ -149,6 +152,7 @@ func _detach_runner(agent_id: String) -> void:
 	_runners.erase(agent_id)
 	ProfileStore.delete_session(agent_id)
 	sessions.erase(agent_id)
+	_output_history.erase(agent_id)
 	_pending_thinking.erase(agent_id)
 	_pending_response.erase(agent_id)
 	_posted_reply.erase(agent_id)
@@ -166,6 +170,7 @@ func _archive_session(agent_id: String) -> void:
 	history.append({
 		"opencode_session": sid,
 		"archived_at": Time.get_unix_time_from_system(),
+		"title": get_session_title(sid),
 	})
 	ProfileStore.save_session_history(agent_id, history)
 
@@ -219,7 +224,45 @@ func set_state(agent_id: String, state: String) -> void:
 
 
 func emit_output(agent_id: String, line: String) -> void:
+	var history: Array = _output_history.get(agent_id, [])
+	history.append(line)
+	if history.size() > 500:
+		_output_history[agent_id] = history.slice(history.size() - 400)
+	else:
+		_output_history[agent_id] = history
 	EventBus.agent_output.emit(agent_id, line)
+
+
+func get_output_history(agent_id: String) -> Array:
+	return _output_history.get(agent_id, [])
+
+
+const SESSION_TITLES_TTL := 20.0
+
+
+func get_session_title(session_id: String) -> String:
+	_ensure_session_titles()
+	return str(_session_titles.get(session_id, ""))
+
+
+func _ensure_session_titles() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if _session_titles_loaded_at >= 0.0 and now - _session_titles_loaded_at < SESSION_TITLES_TTL:
+		return
+	_session_titles_loaded_at = now
+	_session_titles.clear()
+	var output: Array = []
+	var cmd := "opencode session list --format json -n 300 </dev/null"
+	if OS.execute("bash", ["-c", cmd], output, true, false) != OK:
+		return
+	var parsed = JSON.parse_string("\n".join(output))
+	if parsed is not Array:
+		return
+	for entry in parsed:
+		if entry is Dictionary:
+			var id := str(entry.get("id", ""))
+			if not id.is_empty():
+				_session_titles[id] = str(entry.get("title", ""))
 
 
 func emit_chat_error(agent_id: String, message: String) -> void:
@@ -242,6 +285,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 
 	var started := runner.start({
 		"agent_id": agent_id,
+		"agent_name": profile.name,
 		"project": profile.project,
 		"model": profile.model,
 		"variant": profile.model_variant,

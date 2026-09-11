@@ -65,6 +65,8 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	var session := AgentManager.get_session(profile.id)
 	state_label.text = str(session.get("state", "offline")).capitalize()
 	output_log.clear()
+	for line in AgentManager.get_output_history(profile.id):
+		_append_output(str(line))
 	AgentManager.queue_git_refresh(profile.id, 0.3)
 
 

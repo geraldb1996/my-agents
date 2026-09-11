@@ -50,4 +50,5 @@ scripts/
 ```
 
 ## Licencia
-MIT Copyright (c) 2026 Gerald Glitch (Geraldb1996)
+
+MIT © 2026 Gerald Glitch (Geraldb1996)
