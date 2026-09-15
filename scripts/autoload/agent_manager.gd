@@ -45,13 +45,6 @@ const FILE_OP_DELETED := "D"
 const FILE_OP_CREATED := "C"
 const FILE_OP_MODIFIED := "M"
 
-var _file_op_colors: Dictionary = {
-	FILE_OP_READ: Color.WHITE,
-	FILE_OP_DELETED: Color(0.9, 0.3, 0.3),
-	FILE_OP_CREATED: Color(0.4, 0.55, 0.95),
-	FILE_OP_MODIFIED: Color(1.0, 0.8, 0.2),
-}
-
 
 func _ready() -> void:
 	for profile_id in ProfileStore.profiles:

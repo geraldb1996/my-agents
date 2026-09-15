@@ -1,5 +1,6 @@
 extends Control
 
+@onready var background: ColorRect = $Background
 @onready var agents_panel: AgentsPanel = %AgentsPanel
 @onready var workspace_panel: WorkspacePanel = %WorkspacePanel
 @onready var chat_panel: ChatPanel = %ChatPanel
@@ -21,10 +22,16 @@ func _ready() -> void:
 	SkillCatalog.skills_loaded.connect(_on_catalog_loaded)
 	ModelCatalog.load_progress.connect(_on_load_progress.bind("models"))
 	SkillCatalog.load_progress.connect(_on_load_progress.bind("skills"))
+	ThemeManager.theme_changed.connect(_apply_theme)
+	_apply_theme()
 	if not ProfileStore.profiles.is_empty():
 		var first_id: String = ProfileStore.profiles.keys()[0]
 		AgentManager.select_agent(first_id)
 	_start_initial_loading()
+
+
+func _apply_theme() -> void:
+	background.color = ThemeManager.color("window")
 
 
 func _process(delta: float) -> void:

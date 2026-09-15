@@ -138,7 +138,7 @@ func _on_opencode_agents_loaded(code: int, data: Variant, request_id: int) -> vo
 	%AgentStatusLabel.text = "" if loaded else "Could not load agents. Retry Refresh or choose Default (auto)."
 	if not _agent_selection_valid:
 		selected = opencode_agent_select.item_count
-		opencode_agent_select.add_item("Unavailable: " + _selected_opencode_agent)
+		opencode_agent_select.add_item(tr("Unavailable: %s") % _selected_opencode_agent)
 		opencode_agent_select.set_item_disabled(selected, true)
 		if loaded:
 			%AgentStatusLabel.text = "Saved agent no longer exists. Select an available agent or Default (auto)."
@@ -348,7 +348,7 @@ func _build_anim_row(state: String) -> HBoxContainer:
 	row.custom_minimum_size = Vector2(0, 32)
 
 	var state_label := Label.new()
-	state_label.text = state
+	state_label.text = state.capitalize()
 	state_label.custom_minimum_size = Vector2(90, 0)
 	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(state_label)
@@ -387,7 +387,7 @@ func _build_anim_row(state: String) -> HBoxContainer:
 	else:
 		for i in frames.size():
 			var file_name := String(frames[i]).get_file()
-			frames_option.add_item("Frame %d: %s" % [i + 1, file_name], i)
+			frames_option.add_item(tr("Frame %d: %s") % [i + 1, file_name], i)
 	fps_option.select(maxi(0, FPS_OPTIONS.find(int(spec.get("fps", 8.0)))))
 	return row
 

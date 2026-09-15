@@ -341,6 +341,9 @@ func _build_prompt() -> String:
 		if not skills_context.is_empty():
 			parts.append("Your skills: %s" % skills_context)
 		parts.append("RESPONSE FORMAT (mandatory): always start your final reply with 'CHAT:' followed by your message, for example: CHAT: your reply here. Never respond without this prefix.")
+		var language_instruction := SystemSettings.get_agents_language_instruction()
+		if not language_instruction.is_empty():
+			parts.append(language_instruction)
 	if not temp_context.is_empty():
 		parts.append("Temporary skill instructions (session only):\n%s" % temp_context)
 	if not task.is_empty():

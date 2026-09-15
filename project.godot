@@ -23,6 +23,8 @@ config/icon="res://images/agents/agent.png"
 [autoload]
 
 EventBus="*res://scripts/autoload/event_bus.gd"
+ThemeManager="*res://scripts/autoload/theme_manager.gd"
+SystemSettings="*res://scripts/autoload/system_settings.gd"
 ProfileStore="*res://scripts/autoload/profile_store.gd"
 ModelCatalog="*res://scripts/autoload/model_catalog.gd"
 SkillCatalog="*res://scripts/autoload/skill_catalog.gd"
@@ -35,6 +37,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="viewport"
 window/stretch/aspect="expand"
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://translations/ui.es.po")
 
 [physics]
 

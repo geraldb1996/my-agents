@@ -104,7 +104,7 @@ func _on_file_selected(path: String) -> void:
 	_file_name = path.get_file().get_basename()
 	if name_edit.text.strip_edges().is_empty():
 		name_edit.text = _file_name
-	file_path_label.text = "%s (%d chars)" % [path.get_file(), _file_content.length()]
+	file_path_label.text = tr("%s (%d chars)") % [path.get_file(), _file_content.length()]
 	file_path_label.tooltip_text = path
 
 

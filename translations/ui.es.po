@@ -1,0 +1,432 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "System Settings"
+msgstr "Configuración del sistema"
+
+msgid "UI Sounds:"
+msgstr "Sonidos de interfaz:"
+
+msgid "UI Language:"
+msgstr "Idioma de interfaz:"
+
+msgid "Agents Language:"
+msgstr "Idioma de agentes:"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "None"
+msgstr "Ninguno"
+
+msgid "Type"
+msgstr "Escribir"
+
+msgid "Language, e.g. Spanish, English, Japanese..."
+msgstr "Idioma, por ejemplo español, inglés, japonés..."
+
+msgid "None adds no language instruction. Type adds your language to the initial prompt of new agent sessions."
+msgstr "Ninguno no añade instrucciones de idioma. Escribir añade el idioma al prompt inicial de las nuevas sesiones de agentes."
+
+msgid "Could not save settings: %s"
+msgstr "No se pudo guardar la configuración: %s"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "AGENTS"
+msgstr "AGENTES"
+
+msgid "+ New"
+msgstr "+ Nuevo"
+
+msgid "No agents yet.\nCreate one with + New."
+msgstr "Todavía no hay agentes.\nCrea uno con + Nuevo."
+
+msgid "New Session"
+msgstr "Nueva sesión"
+
+msgid "New session"
+msgstr "Nueva sesión"
+
+msgid "Previous Sessions"
+msgstr "Sesiones anteriores"
+
+msgid "Delete Session"
+msgstr "Eliminar sesión"
+
+msgid "Model"
+msgstr "Modelo"
+
+msgid "Variant"
+msgstr "Variante"
+
+msgid "Edit Agent"
+msgstr "Editar agente"
+
+msgid "Duplicate Agent"
+msgstr "Duplicar agente"
+
+msgid "Delete Agent"
+msgstr "Eliminar agente"
+
+msgid "Default (auto)"
+msgstr "Predeterminado (automático)"
+
+msgid "Default (none)"
+msgstr "Predeterminado (ninguno)"
+
+msgid "No variants"
+msgstr "Sin variantes"
+
+msgid "No previous sessions"
+msgstr "Sin sesiones anteriores"
+
+msgid "Session %s"
+msgstr "Sesión %s"
+
+msgid "WORKSPACE"
+msgstr "ESPACIO DE TRABAJO"
+
+msgid "No agent selected"
+msgstr "Ningún agente seleccionado"
+
+msgid "Task for agent..."
+msgstr "Tarea para el agente..."
+
+msgid "Send"
+msgstr "Enviar"
+
+msgid "Start"
+msgstr "Iniciar"
+
+msgid "Stop"
+msgstr "Detener"
+
+msgid "Paste project path or Select Folder"
+msgstr "Pega la ruta del proyecto o selecciona una carpeta"
+
+msgid "Select Folder"
+msgstr "Seleccionar carpeta"
+
+msgid "All Skills"
+msgstr "Todas las skills"
+
+msgid "All skills"
+msgstr "Todas las skills"
+
+msgid "Pick an installed skill to use temporarily"
+msgstr "Elige una skill instalada para usarla temporalmente"
+
+msgid "Load a .md/.txt file or type temporary instructions"
+msgstr "Carga un archivo .md/.txt o escribe instrucciones temporales"
+
+msgid "Temp skills"
+msgstr "Skills temporales"
+
+msgid "Clear"
+msgstr "Limpiar"
+
+msgid "Installed skills..."
+msgstr "Skills instaladas..."
+
+msgid "Task"
+msgstr "Tarea"
+
+msgid "Files"
+msgstr "Archivos"
+
+msgid "Output"
+msgstr "Salida"
+
+msgid "(No task assigned)"
+msgstr "(Sin tarea asignada)"
+
+msgid "Live output"
+msgstr "Salida en vivo"
+
+msgid "Expand live output"
+msgstr "Ampliar salida en vivo"
+
+msgid "Output — %s"
+msgstr "Salida — %s"
+
+msgid "No modified files"
+msgstr "Sin archivos modificados"
+
+msgid "No files touched"
+msgstr "Sin archivos consultados o modificados"
+
+msgid "(R) (white): read - (D) (red): deleted - (C) (blue): created - (M) (yellow): modified"
+msgstr "(R) (blanco): leído - (D) (rojo): eliminado - (C) (azul): creado - (M) (amarillo): modificado"
+
+msgid "Branch: %s"
+msgstr "Rama: %s"
+
+msgid "Not a git repo"
+msgstr "No es un repositorio Git"
+
+msgid "Select Project Folder"
+msgstr "Seleccionar carpeta del proyecto"
+
+msgid "TEAM CHAT"
+msgstr "CHAT DE EQUIPO"
+
+msgid "All"
+msgstr "Todos"
+
+msgid "All agents"
+msgstr "Todos los agentes"
+
+msgid "Clear All"
+msgstr "Borrar todo"
+
+msgid "Message... use @Agent or @all"
+msgstr "Mensaje... usa @Agente o @all"
+
+msgid "Clear chat history"
+msgstr "Borrar historial del chat"
+
+msgid "Delete all chat messages? This cannot be undone."
+msgstr "¿Eliminar todos los mensajes del chat? Esta acción no se puede deshacer."
+
+msgid "You"
+msgstr "Tú"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "Double-click to enlarge message"
+msgstr "Haz doble clic para ampliar el mensaje"
+
+msgid "Team Chat — %s %s"
+msgstr "Chat de equipo — %s %s"
+
+msgid "Copy message"
+msgstr "Copiar mensaje"
+
+msgid "%s is working..."
+msgstr "%s está trabajando..."
+
+msgid "%d agents working..."
+msgstr "%d agentes trabajando..."
+
+msgid "Agent Editor"
+msgstr "Editor de agentes"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "Godot Coder"
+msgstr "Programador de Godot"
+
+msgid "Model (provider/model)"
+msgstr "Modelo (proveedor/modelo)"
+
+msgid "Refresh"
+msgstr "Actualizar"
+
+msgid "provider/model custom..."
+msgstr "proveedor/modelo personalizado..."
+
+msgid "Variant (if any)"
+msgstr "Variante (si existe)"
+
+msgid "custom variant..."
+msgstr "variante personalizada..."
+
+msgid "OpenCode agent (optional)"
+msgstr "Agente de OpenCode (opcional)"
+
+msgid "Personality / System Prompt"
+msgstr "Personalidad / Prompt del sistema"
+
+msgid "skill name..."
+msgstr "nombre de skill..."
+
+msgid "Add"
+msgstr "Añadir"
+
+msgid "Project"
+msgstr "Proyecto"
+
+msgid "Paste path or Select..."
+msgstr "Pega una ruta o selecciona..."
+
+msgid "Select..."
+msgstr "Seleccionar..."
+
+msgid "Animations per State (frames 256x256)"
+msgstr "Animaciones por estado (frames de 256x256)"
+
+msgid "Select Animation Frames (multiple)"
+msgstr "Seleccionar frames de animación (varios)"
+
+msgid "Loading agents..."
+msgstr "Cargando agentes..."
+
+msgid "Loading agents from OpenCode..."
+msgstr "Cargando agentes de OpenCode..."
+
+msgid "Could not load agents. Retry Refresh or choose Default (auto)."
+msgstr "No se pudieron cargar los agentes. Pulsa Actualizar o elige Predeterminado (automático)."
+
+msgid "Unavailable: %s"
+msgstr "No disponible: %s"
+
+msgid "Saved agent no longer exists. Select an available agent or Default (auto)."
+msgstr "El agente guardado ya no existe. Selecciona otro o Predeterminado (automático)."
+
+msgid "Custom model..."
+msgstr "Modelo personalizado..."
+
+msgid "Custom..."
+msgstr "Personalizado..."
+
+msgid "Pick a skill..."
+msgstr "Elige una skill..."
+
+msgid "placeholder (no frames)"
+msgstr "Imagen provisional (sin frames)"
+
+msgid "Frame %d: %s"
+msgstr "Frame %d: %s"
+
+msgid "Temporary Skill"
+msgstr "Skill temporal"
+
+msgid "This context applies only to the current session and is not saved."
+msgstr "Este contexto solo se aplica a la sesión actual y no se guarda."
+
+msgid "Installed skills (opencode global / project local)"
+msgstr "Skills instaladas (globales de OpenCode / locales del proyecto)"
+
+msgid "Local (project)"
+msgstr "Local (proyecto)"
+
+msgid "Or load a .md / .txt file"
+msgstr "O carga un archivo .md / .txt"
+
+msgid "Load file..."
+msgstr "Cargar archivo..."
+
+msgid "No file loaded"
+msgstr "Ningún archivo cargado"
+
+msgid "Or type instructions"
+msgstr "O escribe instrucciones"
+
+msgid "Label (optional)"
+msgstr "Etiqueta (opcional)"
+
+msgid "Extra instructions to inject as temporary skill context..."
+msgstr "Instrucciones adicionales para el contexto temporal de skills..."
+
+msgid "Add instructions"
+msgstr "Añadir instrucciones"
+
+msgid "Load skill instructions"
+msgstr "Cargar instrucciones de skill"
+
+msgid "Pick an installed skill..."
+msgstr "Elige una skill instalada..."
+
+msgid "%s (%d chars)"
+msgstr "%s (%d caracteres)"
+
+msgid "Loading..."
+msgstr "Cargando..."
+
+msgid "Preparing models and skills..."
+msgstr "Preparando modelos y skills..."
+
+msgid "Idle"
+msgstr "En reposo"
+
+msgid "Thinking"
+msgstr "Pensando"
+
+msgid "Working"
+msgstr "Trabajando"
+
+msgid "Reading"
+msgstr "Leyendo"
+
+msgid "Coding"
+msgstr "Programando"
+
+msgid "Searching"
+msgstr "Buscando"
+
+msgid "Waiting"
+msgstr "Esperando"
+
+msgid "Question"
+msgstr "Pregunta"
+
+msgid "Approval"
+msgstr "Aprobación"
+
+msgid "Success"
+msgstr "Completado"
+
+msgid "Offline"
+msgstr "Desconectado"
+
+msgid "requests permission"
+msgstr "solicita permiso"
+
+msgid "asks a question"
+msgstr "hace una pregunta"
+
+msgid "Permission required: %s"
+msgstr "Permiso necesario: %s"
+
+msgid "Requested patterns"
+msgstr "Patrones solicitados"
+
+msgid "Command"
+msgstr "Comando"
+
+msgid "Path"
+msgstr "Ruta"
+
+msgid "Allow once"
+msgstr "Permitir una vez"
+
+msgid "Always allow"
+msgstr "Permitir siempre"
+
+msgid "Reject"
+msgstr "Rechazar"
+
+msgid "The agent needs your answer to continue."
+msgstr "El agente necesita tu respuesta para continuar."
+
+msgid "Your own answer..."
+msgstr "Tu propia respuesta..."
+
+msgid "Send answers"
+msgstr "Enviar respuestas"
+
+msgid "UI Theme:"
+msgstr "Tema de interfaz:"
+
+msgid "Light"
+msgstr "Claro"
+
+msgid "Soft"
+msgstr "Intermedio (soft)"
+
+msgid "Dark"
+msgstr "Oscuro"

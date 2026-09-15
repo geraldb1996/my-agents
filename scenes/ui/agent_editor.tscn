@@ -5,17 +5,6 @@
 [sub_resource type="StyleBoxFlat" id="sb_overlay"]
 bg_color = Color(0, 0, 0, 0.65)
 
-[sub_resource type="StyleBoxFlat" id="sb_dialog"]
-bg_color = Color(0.16, 0.17, 0.21, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-content_margin_left = 16.0
-content_margin_top = 16.0
-content_margin_right = 16.0
-content_margin_bottom = 16.0
-
 [node name="AgentEditor" type="Control"]
 visible = false
 layout_mode = 3
@@ -47,7 +36,7 @@ offset_right = -24.0
 offset_bottom = -64.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("sb_dialog")
+theme_type_variation = &"DialogPanel"
 
 [node name="Scroll" type="ScrollContainer" parent="Dialog"]
 layout_mode = 2
@@ -217,7 +206,7 @@ offset_right = -24.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("sb_dialog")
+theme_type_variation = &"DialogPanel"
 
 [node name="Actions" type="HBoxContainer" parent="ActionsBar"]
 layout_mode = 2

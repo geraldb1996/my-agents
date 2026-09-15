@@ -18,15 +18,23 @@ extends PanelContainer
 @onready var agent_name_label: Label = %AgentNameLabel
 @onready var skill_source_option: OptionButton = %SkillSourceOption
 @onready var task_label: RichTextLabel = %TaskLabel
+@onready var info_tabs: TabContainer = %InfoTabs
+@onready var settings_dialog: SystemSettingsDialog = %SystemSettingsDialog
 
-const TASK_PLACEHOLDER := "(Sin tarea asignada)"
+const TASK_PLACEHOLDER := "(No task assigned)"
 
 var _current_id: String = ""
 var _skills_project: String = ""
 var _last_git_files: Array = []
+var _previous_info_tab: int = 0
+var _displayed_task: String = ""
+var _last_branch: String = ""
+var _has_git_status: bool = false
 
 
 func _ready() -> void:
+	info_tabs.tab_changed.connect(_on_info_tab_changed)
+	info_tabs.set_tab_tooltip(4, "System Settings")
 	%ExpandOutputButton.pressed.connect(_on_expand_output)
 	output_dialog.close_requested.connect(output_dialog.hide)
 	EventBus.agent_output_updated.connect(_on_output_updated)
@@ -52,12 +60,48 @@ func _ready() -> void:
 	SkillCatalog.skills_loaded.connect(_on_skills_loaded)
 	_populate_skill_source_options()
 	clear()
+	_refresh_translations()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
+		_refresh_translations()
+
+
+func _refresh_translations() -> void:
+	for index in 4:
+		info_tabs.set_tab_title(index, tr(["Task", "Files", "Git", "Output"][index]))
+	info_tabs.set_tab_tooltip(4, tr("System Settings"))
+	_update_task_label(_displayed_task)
+	files_label.tooltip_text = _status_legend()
+	if _current_id.is_empty():
+		agent_name_label.text = tr("No agent selected")
+	else:
+		var profile := ProfileStore.get_profile(_current_id)
+		if profile != null:
+			output_dialog.title = tr("Output — %s") % profile.name
+		var files := AgentManager.get_file_status(_current_id)
+		if not files.is_empty():
+			_render_files_status(files)
+		elif _last_git_files.is_empty():
+			files_label.text = tr("No files touched")
+	if _has_git_status:
+		git_label.text = tr("Branch: %s") % _last_branch if not _last_branch.is_empty() else tr("Not a git repo")
+
+
+func _on_info_tab_changed(index: int) -> void:
+	if index == 4:
+		settings_dialog.open()
+		info_tabs.current_tab = _previous_info_tab
+	else:
+		_previous_info_tab = index
 
 
 func clear() -> void:
 	_current_id = ""
 	_last_git_files = []
-	agent_name_label.text = "No agent selected"
+	_has_git_status = false
+	agent_name_label.text = tr("No agent selected")
 	project_path_edit.text = ""
 	state_label.text = "--"
 	git_label.text = "--"
@@ -78,6 +122,8 @@ func clear() -> void:
 
 func _on_agent_selected(profile: AgentProfile) -> void:
 	_current_id = profile.id
+	_has_git_status = false
+	_last_git_files = []
 	agent_name_label.text = profile.name
 	project_path_edit.text = profile.project
 	project_path_edit.tooltip_text = profile.project
@@ -90,7 +136,7 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	_update_task_label(str(session.get("task", "")))
 	output_log.text = ""
 	expanded_output_log.text = ""
-	output_dialog.title = "Output — " + profile.name
+	output_dialog.title = tr("Output — %s") % profile.name
 	var file_status := AgentManager.get_file_status(profile.id)
 	if not file_status.is_empty():
 		_render_files_status(file_status)
@@ -110,7 +156,7 @@ func _on_state_changed(agent_id: String, state: String) -> void:
 	if agent_id != _current_id:
 		return
 	state_label.text = state.capitalize()
-	state_label.modulate = CharacterAvatar.STATE_COLORS.get(state, Color.WHITE).lerp(Color(1, 1, 1), 0.4)
+	state_label.modulate = CharacterAvatar.STATE_COLORS.get(state, Color.WHITE).lerp(ThemeManager.color("text"), 0.25)
 	character_view.set_state(state)
 	var active := state in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval", "success"]
 	start_stop_button.text = "Stop" if active else "Start"
@@ -124,7 +170,8 @@ func _on_task_updated(agent_id: String, task: String) -> void:
 
 
 func _update_task_label(task: String) -> void:
-	task_label.text = task if not task.is_empty() else TASK_PLACEHOLDER
+	_displayed_task = task
+	task_label.text = task if not task.is_empty() else tr(TASK_PLACEHOLDER)
 
 
 func _on_output(agent_id: String, line: String) -> void:
@@ -168,7 +215,7 @@ func _on_files_changed(agent_id: String, files: Array) -> void:
 	if not AgentManager.get_file_status(agent_id).is_empty():
 		return
 	if files.is_empty():
-		files_label.text = "No modified files"
+		files_label.text = tr("No modified files")
 	else:
 		files_label.text = "\n".join(files)
 
@@ -181,25 +228,39 @@ func _on_files_status(agent_id: String, files: Dictionary) -> void:
 
 func _render_files_status(files: Dictionary) -> void:
 	if files.is_empty():
-		files_label.text = "No files touched"
+		files_label.text = tr("No files touched")
 		return
 	var lines: Array[String] = []
 	for path in files:
 		var op := str(files[path])
-		var color: Color = AgentManager._file_op_colors.get(op, Color.WHITE)
+		var color := _file_op_color(op)
 		lines.append("[color=#%s](%s) %s[/color]" % [color.to_html(false), op, path])
 	files_label.text = "\n".join(lines)
 	files_label.tooltip_text = _status_legend()
 
 
+func _file_op_color(op: String) -> Color:
+	match op:
+		AgentManager.FILE_OP_DELETED:
+			return ThemeManager.color("deleted")
+		AgentManager.FILE_OP_CREATED:
+			return ThemeManager.color("created")
+		AgentManager.FILE_OP_MODIFIED:
+			return ThemeManager.color("modified")
+		_:
+			return ThemeManager.color("read")
+
+
 func _status_legend() -> String:
-	return "(R) (white): read - (D) (red): deleted - (C) (blue): created - (M) (yellow): modified"
+	return tr("(R) (white): read - (D) (red): deleted - (C) (blue): created - (M) (yellow): modified")
 
 
 func _on_git_status(agent_id: String, branch: String, status: String) -> void:
 	if agent_id != _current_id:
 		return
-	git_label.text = "Branch: %s" % branch if not branch.is_empty() else "Not a git repo"
+	_last_branch = branch
+	_has_git_status = true
+	git_label.text = tr("Branch: %s") % branch if not branch.is_empty() else tr("Not a git repo")
 	git_label.tooltip_text = status
 
 

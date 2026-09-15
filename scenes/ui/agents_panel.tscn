@@ -2,17 +2,6 @@
 
 [ext_resource type="Script" uid="uid://6xfduv548e3v" path="res://scripts/ui/agents_panel.gd" id="1_agents"]
 
-[sub_resource type="StyleBoxFlat" id="sb_panel"]
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
-bg_color = Color(0.12, 0.13, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
 [node name="AgentsPanel" type="PanelContainer" unique_id=750642462]
 custom_minimum_size = Vector2(280, 0)
 anchors_preset = 15
@@ -20,7 +9,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("sb_panel")
 script = ExtResource("1_agents")
 
 [node name="Root" type="VBoxContainer" parent="." unique_id=344412540]
@@ -51,7 +39,7 @@ size_flags_horizontal = 3
 
 [node name="EmptyLabel" type="Label" parent="Root" unique_id=1697897896]
 unique_name_in_owner = true
-modulate = Color(0.6, 0.6, 0.65, 1)
+theme_type_variation = &"MutedLabel"
 layout_mode = 2
 text = "No agents yet.
 Create one with + New."

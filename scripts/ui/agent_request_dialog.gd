@@ -1,15 +1,12 @@
 class_name AgentRequestDialog
 extends Control
 
-const PANEL_BG := Color(0.16, 0.17, 0.22, 1)
-const TITLE_COLOR := Color(1, 0.82, 0.4)
-const DETAIL_COLOR := Color(0.62, 0.86, 1)
-
 var _queue: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _options: Array = []
 var _custom_edits: Dictionary = {}
 
+var _panel: PanelContainer
 var _avatar: CharacterAvatar
 var _name_label: Label
 var _kind_label: Label
@@ -25,6 +22,7 @@ func _ready() -> void:
 	EventBus.agent_permission_asked.connect(_on_permission_asked)
 	EventBus.agent_question_asked.connect(_on_question_asked)
 	EventBus.agent_request_resolved.connect(_on_request_resolved)
+	ThemeManager.theme_changed.connect(_on_theme_changed)
 	visible = false
 
 
@@ -42,17 +40,11 @@ func _build() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = PANEL_BG
-	style.set_corner_radius_all(10)
-	style.content_margin_left = 18.0
-	style.content_margin_right = 18.0
-	style.content_margin_top = 14.0
-	style.content_margin_bottom = 14.0
-	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size = Vector2(560, 0)
-	center.add_child(panel)
+	_panel = PanelContainer.new()
+	_panel.custom_minimum_size = Vector2(560, 0)
+	center.add_child(_panel)
+	_apply_panel_style()
+	var panel := _panel
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
@@ -70,7 +62,7 @@ func _build() -> void:
 	titles.add_child(_name_label)
 	_kind_label = Label.new()
 	_kind_label.add_theme_font_size_override("font_size", 13)
-	_kind_label.modulate = TITLE_COLOR
+	_kind_label.modulate = ThemeManager.color("warning")
 	titles.add_child(_kind_label)
 	header.add_child(titles)
 	box.add_child(header)
@@ -95,6 +87,25 @@ func _build() -> void:
 	_buttons.alignment = BoxContainer.ALIGNMENT_END
 	_buttons.add_theme_constant_override("separation", 8)
 	box.add_child(_buttons)
+
+
+func _apply_panel_style() -> void:
+	if _panel == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = ThemeManager.color("dialog")
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 14.0
+	style.content_margin_bottom = 14.0
+	_panel.add_theme_stylebox_override("panel", style)
+
+
+func _on_theme_changed() -> void:
+	_apply_panel_style()
+	if visible and not _current.is_empty():
+		_populate()
 
 
 func _on_permission_asked(agent_id: String, request: Dictionary) -> void:
@@ -145,6 +156,7 @@ func _populate() -> void:
 	var profile := ProfileStore.get_profile(agent_id)
 	_avatar.set_profile(profile)
 	_name_label.text = profile.name if profile != null else agent_id
+	_name_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 
 	if str(_current.get("kind", "permission")) == "permission":
 		_avatar.set_state("approval")
@@ -157,21 +169,21 @@ func _populate() -> void:
 
 
 func _populate_permission(request: Dictionary) -> void:
-	_title_label.text = "Permission required: %s" % str(request.get("permission", "action"))
+	_title_label.text = tr("Permission required: %s") % str(request.get("permission", "action"))
 	var patterns: Array = request.get("patterns", [])
 	if not patterns.is_empty():
-		_add_label("Requested patterns", Color(0.75, 0.78, 0.85))
+		_add_label("Requested patterns", ThemeManager.color("muted"))
 		for pattern in patterns:
 			_add_detail(str(pattern))
 	var metadata: Variant = request.get("metadata", {})
 	if metadata is Dictionary:
 		var command := str((metadata as Dictionary).get("command", ""))
 		if not command.is_empty():
-			_add_label("Command", Color(0.75, 0.78, 0.85))
+			_add_label("Command", ThemeManager.color("muted"))
 			_add_detail(command)
 		var path := str((metadata as Dictionary).get("filePath", (metadata as Dictionary).get("path", "")))
 		if not path.is_empty():
-			_add_label("Path", Color(0.75, 0.78, 0.85))
+			_add_label("Path", ThemeManager.color("muted"))
 			_add_detail(path)
 	_add_action("Allow once", func() -> void: _reply_permission("once"))
 	var always: Array = request.get("always", [])
@@ -187,10 +199,12 @@ func _populate_question(request: Dictionary) -> void:
 			continue
 		var question: Dictionary = questions[i]
 		var header := Label.new()
+		header.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		header.text = str(question.get("header", ""))
-		header.modulate = TITLE_COLOR
+		header.modulate = ThemeManager.color("warning")
 		_body.add_child(header)
 		var text := Label.new()
+		text.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		text.text = str(question.get("question", ""))
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_body.add_child(text)
@@ -211,6 +225,7 @@ func _populate_question(request: Dictionary) -> void:
 				b.button_group = group
 				control = b
 			control.text = label if description.is_empty() else "%s — %s" % [label, description]
+			control.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 			control.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			_body.add_child(control)
 			_options.append({"index": i, "label": label, "control": control})
@@ -233,8 +248,9 @@ func _add_label(text: String, color: Color) -> void:
 
 func _add_detail(text: String) -> void:
 	var label := Label.new()
+	label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	label.text = text
-	label.modulate = DETAIL_COLOR
+	label.modulate = ThemeManager.color("accent")
 	label.add_theme_font_size_override("font_size", 12)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.add_child(label)

@@ -34,6 +34,9 @@ var _dialog_agent_id := ""
 
 
 func _ready() -> void:
+	_msg_sound.bus = SystemSettings.UI_AUDIO_BUS
+	SystemSettings.settings_changed.connect(_on_settings_changed)
+	ThemeManager.theme_changed.connect(_on_theme_changed)
 	%SendButton.pressed.connect(_on_send_pressed)
 	%ClearButton.pressed.connect(_on_clear_pressed)
 	%ClearDialog.confirmed.connect(_on_clear_confirmed)
@@ -132,11 +135,11 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	bubble.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var sb := StyleBoxFlat.new()
 	if is_user:
-		sb.bg_color = Color(0.28, 0.42, 0.6, 1)
+		sb.bg_color = ThemeManager.color("bubble_user")
 	elif is_system:
-		sb.bg_color = Color(0.3, 0.28, 0.22, 1)
+		sb.bg_color = ThemeManager.color("bubble_system")
 	else:
-		sb.bg_color = Color(0.2, 0.21, 0.27, 1)
+		sb.bg_color = ThemeManager.color("bubble_agent")
 	sb.set_corner_radius_all(8)
 	sb.content_margin_left = 10.0
 	sb.content_margin_right = 10.0
@@ -148,11 +151,13 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 
 	var header := HBoxContainer.new()
 	var sender_label := Label.new()
-	var color: Color = Color(1, 1, 1)
+	if is_agent:
+		sender_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	var color: Color = ThemeManager.color("text")
 	if is_agent:
 		color = SENDER_COLORS[hash(sender) % SENDER_COLORS.size()]
 	elif is_system:
-		color = Color(0.75, 0.75, 0.5)
+		color = ThemeManager.color("warning")
 	sender_label.text = sender if is_agent else ("You" if is_user else "System")
 	sender_label.modulate = color
 	sender_label.add_theme_font_size_override("font_size", 13)
@@ -163,12 +168,13 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	header.add_child(spacer)
 	var time_label := Label.new()
 	time_label.text = _format_time(timestamp)
-	time_label.modulate = Color(0.55, 0.55, 0.6)
+	time_label.modulate = ThemeManager.color("muted")
 	time_label.add_theme_font_size_override("font_size", 11)
 	header.add_child(time_label)
 	inner.add_child(header)
 
 	var body := Label.new()
+	body.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	body.text = content
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.size_flags_horizontal = Control.SIZE_FILL
@@ -206,17 +212,13 @@ func _show_message_dialog(content: String, sender: String, timestamp: int, agent
 		_message_dialog.exclusive = true
 		_message_dialog.min_size = Vector2i(320, 240)
 		_message_dialog.ok_button_text = "Close"
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.16, 0.17, 0.22, 1)
-		style.set_corner_radius_all(10)
-		style.set_content_margin_all(18.0)
-		_message_dialog.add_theme_stylebox_override("panel", style)
 		var layout := VBoxContainer.new()
 		_message_avatar = CharacterAvatar.new()
 		_message_avatar.custom_minimum_size = Vector2(160, 160)
 		_message_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		layout.add_child(_message_avatar)
 		_message_body = RichTextLabel.new()
+		_message_body.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		_message_body.bbcode_enabled = false
 		_message_body.selection_enabled = true
 		_message_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -225,8 +227,9 @@ func _show_message_dialog(content: String, sender: String, timestamp: int, agent
 		layout.add_child(_message_body)
 		_message_dialog.add_child(layout)
 		add_child(_message_dialog)
+		_apply_dialog_style()
 	_dialog_agent_id = agent_id
-	_message_dialog.title = "Team Chat — %s %s" % [sender, _format_time(timestamp)]
+	_message_dialog.title = tr("Team Chat — %s %s") % [sender, _format_time(timestamp)]
 	_message_body.text = content
 	_sync_dialog_avatar()
 	_message_dialog.popup_centered_clamped(Vector2i(800, 600), 0.9)
@@ -449,7 +452,7 @@ func _update_typing_label() -> void:
 		typing_label.visible = false
 		return
 	var names := _typing.values()
-	typing_label.text = "%s is working..." % names[0] if names.size() == 1 else "%d agents working..." % names.size()
+	typing_label.text = tr("%s is working...") % names[0] if names.size() == 1 else tr("%d agents working...") % names.size()
 	typing_label.visible = true
 
 
@@ -460,7 +463,30 @@ func _autoscroll() -> void:
 
 func _play_msg_sound() -> void:
 	_msg_sound.stop()
-	_msg_sound.play()
+	if SystemSettings.ui_sounds:
+		_msg_sound.play()
+
+
+func _on_settings_changed() -> void:
+	if not SystemSettings.ui_sounds:
+		_msg_sound.stop()
+	_update_typing_label()
+
+
+func _on_theme_changed() -> void:
+	if _message_dialog != null:
+		_apply_dialog_style()
+	_populate_history()
+
+
+func _apply_dialog_style() -> void:
+	if _message_dialog == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = ThemeManager.color("dialog")
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(18.0)
+	_message_dialog.add_theme_stylebox_override("panel", style)
 
 
 func _format_time(ts: int) -> String:

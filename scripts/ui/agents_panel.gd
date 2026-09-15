@@ -44,7 +44,14 @@ func _ready() -> void:
 	%ContextMenu.set_item_submenu(1, "SessionMenu")
 	%ContextMenu.set_item_submenu(3, "ModelMenu")
 	%ContextMenu.set_item_submenu(4, "VariantMenu")
+	ThemeManager.theme_changed.connect(_on_theme_changed)
 	refresh()
+
+
+func _on_theme_changed() -> void:
+	refresh()
+	if not _selected_id.is_empty():
+		_apply_selection_highlight(_selected_id)
 
 
 func refresh() -> void:
@@ -56,6 +63,12 @@ func refresh() -> void:
 		var card := _build_card(profile)
 		agent_list.add_child(card)
 		_cards[profile.id] = card
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
+		for agent_id in _cards:
+			_update_card_session(agent_id)
 
 
 func get_selected_id() -> String:
@@ -81,26 +94,27 @@ func _build_card(profile: AgentProfile) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_label := Label.new()
+	name_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	name_label.text = profile.name
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(name_label)
 	var session_label := Label.new()
 	session_label.name = "SessionLabel"
-	session_label.modulate = Color(0.62, 0.7, 0.85)
+	session_label.modulate = ThemeManager.color("muted")
 	session_label.add_theme_font_size_override("font_size", 9)
 	session_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	session_label.text = _session_text(profile)
 	session_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(session_label)
 	var meta_label := Label.new()
-	meta_label.modulate = Color(0.7, 0.7, 0.75)
+	meta_label.modulate = ThemeManager.color("muted")
 	meta_label.add_theme_font_size_override("font_size", 8)
 	meta_label.text = profile.model
 	meta_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(meta_label)
 	var variant_label := Label.new()
 	variant_label.name = "VariantLabel"
-	variant_label.modulate = Color(1, 0.85, 0.3)
+	variant_label.modulate = ThemeManager.color("warning")
 	variant_label.add_theme_font_size_override("font_size", 8)
 	variant_label.text = profile.model_variant
 	variant_label.visible = not profile.model_variant.is_empty()
@@ -108,7 +122,7 @@ func _build_card(profile: AgentProfile) -> Control:
 	info.add_child(variant_label)
 	var state_label := Label.new()
 	state_label.name = "StateLabel"
-	state_label.modulate = Color(0.6, 0.65, 0.7)
+	state_label.modulate = ThemeManager.color("muted")
 	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(state_label)
 	var context_row := HBoxContainer.new()
@@ -129,7 +143,7 @@ func _build_card(profile: AgentProfile) -> Control:
 	context_pct.name = "ContextPct"
 	context_pct.text = "0%"
 	context_pct.add_theme_font_size_override("font_size", 8)
-	context_pct.modulate = Color(0.5, 0.55, 0.6)
+	context_pct.modulate = ThemeManager.color("muted")
 	context_pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	context_row.add_child(context_pct)
 	info.add_child(context_row)
@@ -151,7 +165,7 @@ func _session_text(profile: AgentProfile) -> String:
 		return "New session"
 	var title := AgentManager.get_session_title(sid, profile.project)
 	if title.is_empty():
-		return "Session %s" % sid.right(6)
+		return tr("Session %s") % sid.right(6)
 	return title
 
 
@@ -253,7 +267,7 @@ func _populate_session_menu(agent_id: String) -> void:
 		if title.is_empty():
 			title = AgentManager.get_session_title(sid, project)
 		if title.is_empty():
-			title = "Session %s" % sid.right(6)
+			title = tr("Session %s") % sid.right(6)
 		var label := "%s · %s" % [title, Time.get_datetime_string_from_unix_time(archived)]
 		%SessionMenu.add_item(label, id)
 		%SessionMenu.set_item_tooltip(id, sid)
@@ -307,7 +321,7 @@ func _apply_selection_highlight(agent_id: String) -> void:
 		var card: Control = _cards[id]
 		if id == agent_id:
 			var sb := StyleBoxFlat.new()
-			sb.bg_color = Color(0.22, 0.28, 0.42, 1)
+			sb.bg_color = ThemeManager.color("selected")
 			sb.set_corner_radius_all(6)
 			card.add_theme_stylebox_override("panel", sb)
 		else:
@@ -377,24 +391,24 @@ func _fmt_tokens(n: int) -> String:
 
 func _context_bar_bg() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.15, 0.16, 0.2, 1)
+	sb.bg_color = ThemeManager.color("sunken")
 	sb.set_corner_radius_all(3)
 	return sb
 
 
 func _context_bar_fill() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.25, 0.55, 1)
+	sb.bg_color = ThemeManager.color("accent")
 	sb.set_corner_radius_all(3)
 	return sb
 
 
 func _update_bar_color(bar: ProgressBar, percent: float) -> void:
-	var col := Color(0.25, 0.55, 1)
+	var col := ThemeManager.color("accent")
 	if percent >= 75.0:
-		col = Color(1, 0.4, 0.35)
+		col = ThemeManager.color("danger")
 	elif percent >= 50.0:
-		col = Color(1, 0.75, 0.3)
+		col = ThemeManager.color("warning")
 	var sb := _context_bar_fill()
 	sb.bg_color = col
 	bar.add_theme_stylebox_override("fill", sb)

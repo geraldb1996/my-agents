@@ -1,19 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/workspace_panel.gd" id="1_ws"]
 [ext_resource type="PackedScene" path="res://scenes/ui/character_view.tscn" id="2_char"]
 [ext_resource type="PackedScene" path="res://scenes/ui/temp_skill_dialog.tscn" id="3_tsd"]
-
-[sub_resource type="StyleBoxFlat" id="sb_panel"]
-bg_color = Color(0.12, 0.13, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
+[ext_resource type="PackedScene" path="res://scenes/ui/system_settings_dialog.tscn" id="4_settings"]
 
 [node name="WorkspacePanel" type="PanelContainer"]
 layout_mode = 3
@@ -22,7 +12,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("sb_panel")
 script = ExtResource("1_ws")
 
 [node name="Root" type="VBoxContainer" parent="."]
@@ -39,8 +28,9 @@ size_flags_horizontal = 3
 
 [node name="AgentNameLabel" type="Label" parent="Root/Header"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 layout_mode = 2
-modulate = Color(0.6, 0.65, 0.7, 1)
+theme_type_variation = &"MutedLabel"
 text = "No agent selected"
 
 [node name="TaskRow" type="HBoxContainer" parent="Root"]
@@ -118,7 +108,7 @@ layout_mode = 2
 
 [node name="TempSkillsTitle" type="Label" parent="Root/TempSkillsRow"]
 layout_mode = 2
-modulate = Color(0.7, 0.72, 0.78, 1)
+theme_type_variation = &"MutedLabel"
 text = "Temp skills"
 
 [node name="TempSkillsBox" type="VBoxContainer" parent="Root/TempSkillsRow"]
@@ -151,12 +141,13 @@ vertical_scroll_mode = 2
 
 [node name="TaskLabel" type="RichTextLabel" parent="Root/InfoTabs/Task"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
 autowrap_mode = 2
 fit_content = true
-text = "(Sin tarea asignada)"
+text = "(No task assigned)"
 
 [node name="Files" type="ScrollContainer" parent="Root/InfoTabs"]
 layout_mode = 2
@@ -164,6 +155,7 @@ vertical_scroll_mode = 2
 
 [node name="FilesLabel" type="RichTextLabel" parent="Root/InfoTabs/Files"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
@@ -177,11 +169,12 @@ vertical_scroll_mode = 2
 
 [node name="GitLabel" type="Label" parent="Root/InfoTabs/Git"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
+theme_type_variation = &"MutedLabel"
 autowrap_mode = 2
-modulate = Color(0.75, 0.75, 0.8, 1)
 text = "--"
 
 [node name="Output" type="VBoxContainer" parent="Root/InfoTabs"]
@@ -204,10 +197,17 @@ tooltip_text = "Expand live output"
 
 [node name="OutputLog" type="RichTextLabel" parent="Root/InfoTabs/Output"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 scroll_following = true
 selection_enabled = true
+
+[node name="Sis" type="Control" parent="Root/InfoTabs"]
+layout_mode = 2
+
+[node name="SystemSettingsDialog" parent="." instance=ExtResource("4_settings")]
+unique_name_in_owner = true
 
 [node name="OutputDialog" type="Window" parent="."]
 unique_name_in_owner = true
@@ -220,6 +220,7 @@ exclusive = true
 
 [node name="ExpandedOutputLog" type="RichTextLabel" parent="OutputDialog"]
 unique_name_in_owner = true
+auto_translate_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

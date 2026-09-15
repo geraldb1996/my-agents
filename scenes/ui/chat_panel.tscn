@@ -3,28 +3,6 @@
 [ext_resource type="Script" uid="uid://bxtq70oyut3dv" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
 [ext_resource type="AudioStreamWAV" uid="uid://00jny4c3h66i" path="res://ui_snd/msg.wav" id="2_snd"]
 
-[sub_resource type="StyleBoxFlat" id="sb_panel"]
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
-bg_color = Color(0.12, 0.13, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="sb_scroll"]
-content_margin_left = 6.0
-content_margin_top = 6.0
-content_margin_right = 6.0
-content_margin_bottom = 6.0
-bg_color = Color(0.07, 0.075, 0.09, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
 [node name="ChatPanel" type="PanelContainer" unique_id=482658913]
 custom_minimum_size = Vector2(340, 0)
 anchors_preset = 15
@@ -32,7 +10,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("sb_panel")
 script = ExtResource("1_chat")
 
 [node name="Root" type="VBoxContainer" parent="." unique_id=431668118]
@@ -66,7 +43,7 @@ text = "Clear All"
 [node name="ScrollPanel" type="PanelContainer" parent="Root" unique_id=1016154770]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_styles/panel = SubResource("sb_scroll")
+theme_type_variation = &"SunkenPanel"
 
 [node name="Scroll" type="ScrollContainer" parent="Root/ScrollPanel" unique_id=657211153]
 unique_name_in_owner = true
@@ -81,7 +58,7 @@ size_flags_horizontal = 3
 [node name="TypingLabel" type="Label" parent="Root" unique_id=1673171444]
 unique_name_in_owner = true
 visible = false
-modulate = Color(0.6, 0.65, 0.7, 1)
+theme_type_variation = &"MutedLabel"
 layout_mode = 2
 
 [node name="InputRow" type="HBoxContainer" parent="Root" unique_id=1158968561]
