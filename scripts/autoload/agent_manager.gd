@@ -5,6 +5,7 @@ const TOOL_STATES := {
 	"edit": "coding",
 	"multi_edit": "coding",
 	"patch": "coding",
+	"apply_patch": "coding",
 	"write": "coding",
 	"read": "reading",
 	"grep": "searching",
@@ -644,7 +645,7 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 	var note := title
 	if tool_name == "bash":
 		note = "bash: %s" % str(tool_input.get("command", title))
-	elif tool_name in ["edit", "write", "patch"]:
+	elif tool_name in ["edit", "multi_edit", "write", "patch", "apply_patch"]:
 		note = "%s: %s" % [tool_name, str(tool_input.get("filePath", title))]
 
 	match status:
@@ -659,7 +660,8 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 		"completed":
 			emit_output(agent_id, "[tool] %s (done)" % note)
 			set_state(agent_id, base_state)
-			_track_file_operation(agent_id, tool_name, tool_input, status)
+			var metadata: Variant = tool_state.get("metadata", {})
+			_track_file_operation(agent_id, tool_name, tool_input, status, metadata if metadata is Dictionary else {})
 			_flash_state(agent_id, "success", 1.2)
 		"error":
 			emit_output(agent_id, "! %s (error)" % note)
@@ -667,11 +669,13 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 		_:
 			set_state(agent_id, base_state)
 
-	if tool_name in ["bash", "edit", "write", "patch"]:
+	if tool_name in ["bash", "edit", "multi_edit", "write", "patch", "apply_patch"]:
 		queue_git_refresh(agent_id, 1.0)
 
 
-func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dictionary, status: String) -> void:
+func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dictionary, status: String, metadata: Dictionary = {}) -> void:
+	if status != "completed":
+		return
 	var op: String = ""
 	var files: Array = []
 	match tool_name:
@@ -685,8 +689,18 @@ func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dict
 			var path := str(tool_input.get("filePath", ""))
 			if not path.is_empty():
 				files.append(path)
-		"multi_edit", "patch":
+		"apply_patch", "patch":
+			var patch_text := str(tool_input.get("patchText", tool_input.get("patch", "")))
+			if not patch_text.is_empty():
+				_track_patch_files(agent_id, patch_text)
+				return
 			op = FILE_OP_MODIFIED
+			for edit in tool_input.get("edits", []):
+				if edit is Dictionary:
+					files.append(str(edit.get("filePath", "")))
+		"multi_edit":
+			op = FILE_OP_MODIFIED
+			files.append(str(tool_input.get("filePath", "")))
 			for edit in tool_input.get("edits", []):
 				if edit is Dictionary:
 					files.append(str((edit as Dictionary).get("filePath", "")))
@@ -694,7 +708,7 @@ func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dict
 			var path := str(tool_input.get("filePath", ""))
 			if path.is_empty():
 				return
-			op = FILE_OP_MODIFIED if FileAccess.file_exists(path) else FILE_OP_CREATED
+			op = FILE_OP_MODIFIED if bool(metadata.get("exists", true)) else FILE_OP_CREATED
 			files.append(path)
 		"bash":
 			_track_bash_deletes(agent_id, str(tool_input.get("command", "")))
@@ -706,6 +720,24 @@ func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dict
 		if path.is_empty():
 			continue
 		_record_file_status(agent_id, path, op)
+
+
+func _track_patch_files(agent_id: String, patch_text: String) -> void:
+	var updated_path := ""
+	for line in patch_text.split("\n"):
+		if line.begins_with("*** Add File: "):
+			updated_path = ""
+			_record_file_status(agent_id, line.trim_prefix("*** Add File: "), FILE_OP_CREATED)
+		elif line.begins_with("*** Delete File: "):
+			updated_path = ""
+			_record_file_status(agent_id, line.trim_prefix("*** Delete File: "), FILE_OP_DELETED)
+		elif line.begins_with("*** Update File: "):
+			updated_path = line.trim_prefix("*** Update File: ")
+			_record_file_status(agent_id, updated_path, FILE_OP_MODIFIED)
+		elif line.begins_with("*** Move to: ") and not updated_path.is_empty():
+			_record_file_status(agent_id, updated_path, FILE_OP_DELETED)
+			_record_file_status(agent_id, line.trim_prefix("*** Move to: "), FILE_OP_CREATED)
+			updated_path = ""
 
 
 func _track_bash_deletes(agent_id: String, command: String) -> void:
@@ -724,11 +756,36 @@ func _track_bash_deletes(agent_id: String, command: String) -> void:
 
 
 func _record_file_status(agent_id: String, path: String, op: String) -> void:
+	path = _normalize_file_path(agent_id, path)
+	if path.is_empty():
+		return
 	if not _file_status.has(agent_id):
 		_file_status[agent_id] = {}
 	var files: Dictionary = _file_status[agent_id]
+	var previous := str(files.get(path, ""))
+	if op == FILE_OP_READ and not previous.is_empty():
+		return
+	if op == FILE_OP_MODIFIED and previous == FILE_OP_CREATED:
+		return
 	files[path] = op
 	EventBus.agent_files_status.emit(agent_id, files.duplicate())
+
+
+func _normalize_file_path(agent_id: String, path: String) -> String:
+	path = path.strip_edges()
+	if path.is_empty():
+		return ""
+	if path.begins_with("res://") or path.begins_with("user://"):
+		path = ProjectSettings.globalize_path(path)
+	elif not path.is_absolute_path():
+		var project := _project_of(agent_id)
+		if project.begins_with("~"):
+			project = OS.get_environment("HOME").path_join(project.trim_prefix("~").trim_prefix("/"))
+		if project.begins_with("res://") or project.begins_with("user://"):
+			project = ProjectSettings.globalize_path(project)
+		if not project.is_empty():
+			path = project.path_join(path)
+	return path.simplify_path()
 
 
 func _finish_task(agent_id: String) -> void:

@@ -6,15 +6,12 @@ const ANIMATION_STATES: Array[String] = [
 	"searching", "waiting", "question", "approval", "error", "success", "offline",
 ]
 
-const DEFAULT_CHARACTER := "res://images/agents/agent.png"
-
 @export var id: String = ""
 @export var name: String = "New Agent"
 @export var model: String = ""
 @export var model_variant: String = ""
 @export_multiline var personality: String = ""
 @export var skills: Array[String] = []
-@export var character: String = DEFAULT_CHARACTER
 @export var animations: Dictionary = {}
 @export var opencode_agent: String = ""
 @export var project: String = ""
@@ -80,7 +77,6 @@ func to_dict() -> Dictionary:
 		"model_variant": model_variant,
 		"personality": personality,
 		"skills": skills,
-		"character": character,
 		"animations": animations,
 		"opencode_agent": opencode_agent,
 		"project": project,
@@ -98,7 +94,6 @@ static func from_dict(data: Dictionary) -> AgentProfile:
 	p.personality = str(data.get("personality", ""))
 	var raw_skills: Array = data.get("skills", [])
 	p.skills.assign(raw_skills)
-	p.character = str(data.get("character", DEFAULT_CHARACTER))
 	p.animations = data.get("animations", {})
 	p.opencode_agent = str(data.get("opencode_agent", ""))
 	p.project = str(data.get("project", ""))

@@ -1,6 +1,7 @@
 extends Node
 
 signal skills_loaded
+signal load_progress(value: float)
 
 var skills: Array[String] = []
 var global_skills: Array[String] = []
@@ -9,12 +10,42 @@ var skill_paths: Dictionary = {}
 var skill_sources: Dictionary = {}
 var loaded_once: bool = false
 var loading: bool = false
+var _thread: Thread
 
 
 func refresh(project_path: String = "") -> void:
 	if loading:
 		return
 	loading = true
+	_do_refresh(project_path)
+	loading = false
+	loaded_once = true
+	skills_loaded.emit()
+
+
+func refresh_async(project_path: String = "") -> void:
+	if loading:
+		return
+	loading = true
+	_thread = Thread.new()
+	_thread.start(_refresh_worker.bind(project_path))
+
+
+func _refresh_worker(project_path: String) -> void:
+	_do_refresh(project_path)
+	call_deferred("_finish_async")
+
+
+func _finish_async() -> void:
+	if _thread != null:
+		_thread.wait_to_finish()
+		_thread = null
+	loading = false
+	loaded_once = true
+	skills_loaded.emit()
+
+
+func _do_refresh(project_path: String) -> void:
 	skills.clear()
 	global_skills.clear()
 	local_skills.clear()
@@ -23,6 +54,7 @@ func refresh(project_path: String = "") -> void:
 	var home := OS.get_environment("HOME")
 	_scan_dir(home.path_join(".config/opencode/skills"), true)
 	_scan_dir(home.path_join(".agents/skills"), true)
+	_emit_progress(0.5)
 	var project := project_path.strip_edges()
 	if project.is_empty():
 		_scan_dir(ProjectSettings.globalize_path("res://.opencode/skills"), false)
@@ -33,9 +65,15 @@ func refresh(project_path: String = "") -> void:
 	skills.sort()
 	global_skills.sort()
 	local_skills.sort()
-	loading = false
-	loaded_once = true
-	skills_loaded.emit()
+	_emit_progress(1.0)
+
+
+func _emit_progress(value: float) -> void:
+	call_deferred("_notify_progress", value)
+
+
+func _notify_progress(value: float) -> void:
+	load_progress.emit(value)
 
 
 func _expand_path(path: String) -> String:

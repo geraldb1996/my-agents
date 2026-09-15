@@ -1,27 +1,22 @@
 extends Node
 
 signal models_loaded
+signal load_progress(value: float)
 
 var models: Array[String] = []
 var model_variants: Dictionary = {}
 var model_limits: Dictionary = {}
 var loaded_once: bool = false
 var loading: bool = false
+var _thread: Thread
 
 
 func refresh() -> void:
 	if loading:
 		return
 	loading = true
-	var output: Array = []
-	var err := OS.execute("opencode", ["models"], output, true, false)
+	_do_refresh(false)
 	loading = false
-	models.clear()
-	if err != OK:
-		push_warning("opencode models failed with error %d" % err)
-		return
-	_collect_models(output)
-	_load_variants()
 	loaded_once = true
 	models_loaded.emit()
 
@@ -30,16 +25,54 @@ func refresh_with_network() -> void:
 	if loading:
 		return
 	loading = true
-	var output: Array = []
-	var err := OS.execute("opencode", ["models", "--refresh"], output, true, false)
+	_do_refresh(true)
 	loading = false
-	models.clear()
-	if err != OK:
-		return
-	_collect_models(output)
-	_load_variants()
 	loaded_once = true
 	models_loaded.emit()
+
+
+func refresh_async() -> void:
+	if loading:
+		return
+	loading = true
+	_thread = Thread.new()
+	_thread.start(_refresh_worker)
+
+
+func _refresh_worker() -> void:
+	_do_refresh(false)
+	call_deferred("_finish_async")
+
+
+func _finish_async() -> void:
+	if _thread != null:
+		_thread.wait_to_finish()
+		_thread = null
+	loading = false
+	loaded_once = true
+	models_loaded.emit()
+
+
+func _do_refresh(network: bool) -> void:
+	var args := ["models", "--refresh"] if network else ["models"]
+	var output: Array = []
+	var err := OS.execute("opencode", args, output, true, false)
+	models.clear()
+	if err != OK:
+		push_warning("opencode models failed with error %d" % err)
+		return
+	_collect_models(output)
+	_emit_progress(0.5)
+	_load_variants()
+	_emit_progress(1.0)
+
+
+func _emit_progress(value: float) -> void:
+	call_deferred("_notify_progress", value)
+
+
+func _notify_progress(value: float) -> void:
+	load_progress.emit(value)
 
 
 func get_variants(model_id: String) -> Array:

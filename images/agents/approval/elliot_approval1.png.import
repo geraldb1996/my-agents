@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://y7kjhmklain6"
-path="res://.godot/imported/agent.png-22bdd448030a3457042db97db7630b4c.ctex"
+uid="uid://yy6t5j1g3q15"
+path="res://.godot/imported/elliot_approval1.png-123770ba596f43b5c601ed90c79d446e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://agent.png"
-dest_files=["res://.godot/imported/agent.png-22bdd448030a3457042db97db7630b4c.ctex"]
+source_file="res://images/agents/approval/elliot_approval1.png"
+dest_files=["res://.godot/imported/elliot_approval1.png-123770ba596f43b5c601ed90c79d446e.ctex"]
 
 [params]
 

@@ -68,13 +68,9 @@ func _init() -> void:
 func set_profile(p: AgentProfile) -> void:
 	profile = p
 	_frames.clear()
+	_frame_index = 0
+	_frame_timer = 0.0
 	if p != null:
-		var path := p.character
-		if path.is_empty():
-			path = BASE_TEXTURE
-		var tex := _load_texture(path)
-		if tex != null:
-			avatar.texture = tex
 		_prepare_custom_frames()
 	set_state("idle")
 
@@ -128,6 +124,11 @@ func _process(delta: float) -> void:
 
 func _apply_state(_state: String) -> void:
 	avatar.modulate = Color(1, 1, 1)
+	avatar.position = Vector2.ZERO
+	avatar.rotation = 0.0
+	avatar.scale = Vector2.ONE
+	var anim_frames: Array = _frames.get(_state, [])
+	avatar.texture = anim_frames[_frame_index] if not anim_frames.is_empty() else _load_texture(BASE_TEXTURE)
 
 
 func _prepare_custom_frames() -> void:
@@ -185,7 +186,13 @@ func _get_anim_fps(state: String) -> float:
 
 
 func _load_texture(path: String) -> Texture2D:
+	if ResourceLoader.exists(path, "Texture2D"):
+		return ResourceLoader.load(path, "Texture2D") as Texture2D
 	if not FileAccess.file_exists(path):
 		push_warning("Texture not found: %s" % path)
 		return null
-	return load(path) as Texture2D
+	var image := Image.load_from_file(path)
+	if image == null or image.is_empty():
+		push_warning("Could not load texture: %s" % path)
+		return null
+	return ImageTexture.create_from_image(image)

@@ -1,0 +1,111 @@
+{
+	"id": "ag_default_amy",
+	"name": "Amy",
+	"model": "opencode/big-pickle",
+	"model_variant": "",
+	"personality": "very friendly, energetic and commited to work (speaks spanish)",
+	"skills": [],
+	"animations": {
+		"approval": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/amy_approval1.png",
+				"res://images/agents/approval/amy_approval2.png",
+				"res://images/agents/approval/amy_approval3.png",
+				"res://images/agents/approval/amy_approval4.png"
+			]
+		},
+		"coding": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/amy-work1.png",
+				"res://images/agents/working/amy-work2.png",
+				"res://images/agents/working/amy-work3.png",
+				"res://images/agents/working/amy-work4.png"
+			]
+		},
+		"error": {
+			"fps": 6.0
+		},
+		"idle": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/idle/amy-idle1.png",
+				"res://images/agents/idle/amy-idle2.png",
+				"res://images/agents/idle/amy-idle3.png",
+				"res://images/agents/idle/amy-idle4.png"
+			]
+		},
+		"offline": {
+			"fps": 6.0
+		},
+		"question": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/amy_approval1.png",
+				"res://images/agents/approval/amy_approval2.png",
+				"res://images/agents/approval/amy_approval3.png",
+				"res://images/agents/approval/amy_approval4.png"
+			]
+		},
+		"reading": {
+			"fps": 4.0,
+			"frames": [
+				"res://images/agents/thinking/amy_thinking1.png",
+				"res://images/agents/thinking/amy_thinking2.png",
+				"res://images/agents/thinking/amy_thinking3.png",
+				"res://images/agents/thinking/amy_thinking4.png"
+			]
+		},
+		"searching": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/amy-work1.png",
+				"res://images/agents/working/amy-work2.png",
+				"res://images/agents/working/amy-work3.png",
+				"res://images/agents/working/amy-work4.png"
+			]
+		},
+		"success": {
+			"fps": 6.0
+		},
+		"terminal": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/amy-work1.png",
+				"res://images/agents/working/amy-work2.png",
+				"res://images/agents/working/amy-work3.png",
+				"res://images/agents/working/amy-work4.png"
+			]
+		},
+		"thinking": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/thinking/amy_thinking1.png",
+				"res://images/agents/thinking/amy_thinking2.png",
+				"res://images/agents/thinking/amy_thinking3.png",
+				"res://images/agents/thinking/amy_thinking4.png"
+			]
+		},
+		"waiting": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/idle/amy-idle1.png",
+				"res://images/agents/idle/amy-idle2.png",
+				"res://images/agents/idle/amy-idle3.png",
+				"res://images/agents/idle/amy-idle4.png"
+			]
+		},
+		"working": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/amy-work1.png",
+				"res://images/agents/working/amy-work2.png",
+				"res://images/agents/working/amy-work3.png",
+				"res://images/agents/working/amy-work4.png"
+			]
+		}
+	},
+	"opencode_agent": "",
+	"project": ""
+}

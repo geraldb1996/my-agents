@@ -1,0 +1,82 @@
+{
+	"id": "ag_default_lucy",
+	"name": "Lucy",
+	"model": "opencode/big-pickle",
+	"model_variant": "",
+	"personality": "Tsundere personality, sometimes pitty and treats the user as an useless person. (speaks spanish)",
+	"skills": [],
+	"animations": {
+		"approval": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/lucy_approval2.png",
+				"res://images/agents/approval/lucy_approval3.png"
+			]
+		},
+		"coding": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/lucy_working1.png",
+				"res://images/agents/working/lucy_working2.png",
+				"res://images/agents/working/lucy_working3.png",
+				"res://images/agents/working/lucy_working4.png"
+			]
+		},
+		"idle": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/idle/lucy_idle1.png",
+				"res://images/agents/idle/lucy_idle2.png",
+				"res://images/agents/idle/lucy_idle3.png",
+				"res://images/agents/idle/lucy_idle4.png"
+			]
+		},
+		"reading": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/idle/lucy_idle1.png",
+				"res://images/agents/idle/lucy_idle2.png",
+				"res://images/agents/idle/lucy_idle3.png",
+				"res://images/agents/idle/lucy_idle4.png"
+			]
+		},
+		"searching": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/lucy_working1.png",
+				"res://images/agents/working/lucy_working2.png",
+				"res://images/agents/working/lucy_working3.png",
+				"res://images/agents/working/lucy_working4.png"
+			]
+		},
+		"terminal": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/lucy_working1.png",
+				"res://images/agents/working/lucy_working2.png",
+				"res://images/agents/working/lucy_working3.png",
+				"res://images/agents/working/lucy_working4.png"
+			]
+		},
+		"thinking": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/thinking/lucy_thinking1.png",
+				"res://images/agents/thinking/lucy_thinking2.png",
+				"res://images/agents/thinking/lucy_thinking3.png",
+				"res://images/agents/thinking/lucy_thinking4.png"
+			]
+		},
+		"working": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/lucy_working1.png",
+				"res://images/agents/working/lucy_working2.png",
+				"res://images/agents/working/lucy_working3.png",
+				"res://images/agents/working/lucy_working4.png"
+			]
+		}
+	},
+	"opencode_agent": "",
+	"project": ""
+}

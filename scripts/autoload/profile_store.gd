@@ -3,6 +3,7 @@ extends Node
 const PROFILES_DIR := "user://agents"
 const SESSIONS_DIR := "user://sessions"
 const CHAT_PATH := "user://chat.json"
+const DEFAULT_AGENTS_DIR := "res://agents/default"
 
 var profiles: Dictionary = {}
 var chat_history: Array = []
@@ -12,6 +13,7 @@ func _ready() -> void:
 	randomize()
 	_ensure_dirs()
 	load_profiles()
+	_seed_default_profiles()
 	load_chat_history()
 
 
@@ -37,6 +39,23 @@ func load_profiles() -> void:
 			var profile := AgentProfile.from_dict(parsed)
 			profile.ensure_id()
 			profiles[profile.id] = profile
+
+
+func _seed_default_profiles() -> void:
+	if not profiles.is_empty():
+		return
+	var dir := DirAccess.open(DEFAULT_AGENTS_DIR)
+	if dir == null:
+		return
+	for file_name in dir.get_files():
+		if not file_name.ends_with(".json"):
+			continue
+		var text := _read_text(DEFAULT_AGENTS_DIR.path_join(file_name))
+		if text.is_empty():
+			continue
+		var parsed = JSON.parse_string(text)
+		if parsed is Dictionary:
+			save_profile(AgentProfile.from_dict(parsed))
 
 
 func save_profile(profile: AgentProfile) -> void:

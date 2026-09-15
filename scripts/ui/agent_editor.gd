@@ -13,8 +13,6 @@ extends Control
 @onready var skill_select: OptionButton = %SkillSelect
 @onready var anim_box: VBoxContainer = %AnimBox
 @onready var anim_dialog: FileDialog = %AnimDialog
-@onready var character_preview: TextureRect = %CharacterPreview
-@onready var character_dialog: FileDialog = %CharacterDialog
 @onready var project_path_edit: LineEdit = %ProjectPathEdit
 @onready var project_dialog: FileDialog = %ProjectDialog
 
@@ -22,7 +20,6 @@ const FPS_OPTIONS := [4, 6, 8, 10, 12, 15, 24, 30]
 const VARIANT_OPTIONS := ["", "minimal", "low", "medium", "high", "max"]
 
 var _editing_id: String = ""
-var _character_path: String = AgentProfile.DEFAULT_CHARACTER
 var _project_path: String = ""
 var _animations: Dictionary = {}
 var _anim_dialog_state: String = ""
@@ -37,9 +34,7 @@ func _ready() -> void:
 	%CancelButton.pressed.connect(_on_cancel_pressed)
 	%AgentRefreshButton.pressed.connect(_refresh_opencode_agents)
 	opencode_agent_select.item_selected.connect(_on_opencode_agent_selected)
-	%CharacterButton.pressed.connect(func(): character_dialog.popup_centered_ratio(0.5))
 	%ProjectButton.pressed.connect(func(): project_dialog.popup_centered_ratio(0.5))
-	character_dialog.file_selected.connect(_on_character_selected)
 	project_dialog.dir_selected.connect(_on_project_selected)
 	project_path_edit.text_submitted.connect(_on_project_path_submitted)
 	%ModelRefreshButton.pressed.connect(_on_refresh_models_pressed)
@@ -64,12 +59,10 @@ func open_profile(profile: AgentProfile) -> void:
 	name_edit.text = profile.name
 	_selected_opencode_agent = profile.opencode_agent
 	personality_edit.text = profile.personality
-	_character_path = profile.character if not profile.character.is_empty() else AgentProfile.DEFAULT_CHARACTER
 	_project_path = profile.project
 	_refresh_skills(profile.skills)
 	_animations = profile.animations.duplicate(true)
 	_refresh_animation_rows()
-	_update_character_preview()
 	_update_project_label()
 	_ensure_catalogs()
 	_select_model(profile.model)
@@ -88,12 +81,10 @@ func _populate_defaults() -> void:
 	name_edit.text = ""
 	_selected_opencode_agent = ""
 	personality_edit.text = ""
-	_character_path = AgentProfile.DEFAULT_CHARACTER
 	_project_path = ""
 	_refresh_skills([])
 	_animations = {}
 	_refresh_animation_rows()
-	_update_character_preview()
 	_update_project_label()
 	_select_model("")
 	model_custom_edit.text = ""
@@ -460,11 +451,6 @@ func _collect_image_files(path: String) -> Array[String]:
 	return out
 
 
-func _on_character_selected(path: String) -> void:
-	_character_path = path
-	_update_character_preview()
-
-
 func _on_project_selected(path: String) -> void:
 	_project_path = path
 	_update_project_label()
@@ -484,14 +470,6 @@ func _on_project_path_submitted(text: String) -> void:
 		return
 	_project_path = path
 	_update_project_label()
-
-
-func _update_character_preview() -> void:
-	if FileAccess.file_exists(_character_path):
-		character_preview.texture = load(_character_path)
-	else:
-		character_preview.texture = null
-	character_preview.tooltip_text = _character_path
 
 
 func _update_project_label() -> void:
@@ -519,7 +497,6 @@ func _on_save_pressed() -> void:
 		profile.opencode_agent = _selected_opencode_agent
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()
-		profile.character = _character_path
 		profile.project = _project_path
 		profile.animations = _animations.duplicate(true)
 	else:
@@ -531,7 +508,6 @@ func _on_save_pressed() -> void:
 		profile.opencode_agent = _selected_opencode_agent
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()
-		profile.character = _character_path
 		profile.project = _project_path
 		profile.animations = _animations.duplicate(true)
 		profile.created_at = Time.get_unix_time_from_system()

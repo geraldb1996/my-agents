@@ -187,7 +187,7 @@ func _render_files_status(files: Dictionary) -> void:
 	for path in files:
 		var op := str(files[path])
 		var color: Color = AgentManager._file_op_colors.get(op, Color.WHITE)
-		lines.append("[color=#%s](%s)[/color] %s" % [color.to_html(false), op, path])
+		lines.append("[color=#%s](%s) %s[/color]" % [color.to_html(false), op, path])
 	files_label.text = "\n".join(lines)
 	files_label.tooltip_text = _status_legend()
 

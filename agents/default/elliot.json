@@ -1,0 +1,102 @@
+{
+	"id": "ag_default_elliot",
+	"name": "Elliot",
+	"model": "opencode/big-pickle",
+	"model_variant": "",
+	"personality": "Neutral personality, very professional and straight forward, if something is not the best way to do something he tells you before continue and ask if you want to proceed anyway (speaks spanish)",
+	"skills": [],
+	"animations": {
+		"approval": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/elliot_approval1.png",
+				"res://images/agents/approval/elliot_approval2.png",
+				"res://images/agents/approval/elliot_approval3.png",
+				"res://images/agents/approval/elliot_approval4.png"
+			]
+		},
+		"coding": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/Elliot_working1.png",
+				"res://images/agents/working/Elliot_working2.png",
+				"res://images/agents/working/Elliot_working3.png",
+				"res://images/agents/working/Elliot_working4.png"
+			]
+		},
+		"idle": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/idle/Elliot_idle1.png",
+				"res://images/agents/idle/Elliot_idle2.png",
+				"res://images/agents/idle/Elliot_idle3.png",
+				"res://images/agents/idle/Elliot_idle4.png"
+			]
+		},
+		"question": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/elliot_approval1.png",
+				"res://images/agents/approval/elliot_approval2.png",
+				"res://images/agents/approval/elliot_approval3.png",
+				"res://images/agents/approval/elliot_approval4.png"
+			]
+		},
+		"reading": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/Elliot_working1.png",
+				"res://images/agents/working/Elliot_working2.png",
+				"res://images/agents/working/Elliot_working3.png",
+				"res://images/agents/working/Elliot_working4.png"
+			]
+		},
+		"searching": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/Elliot_working1.png",
+				"res://images/agents/working/Elliot_working2.png",
+				"res://images/agents/working/Elliot_working3.png",
+				"res://images/agents/working/Elliot_working4.png"
+			]
+		},
+		"terminal": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/Elliot_working1.png",
+				"res://images/agents/working/Elliot_working2.png",
+				"res://images/agents/working/Elliot_working3.png",
+				"res://images/agents/working/Elliot_working4.png"
+			]
+		},
+		"thinking": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/thinking/elliot_thinking1.png",
+				"res://images/agents/thinking/elliot_thinking2.png",
+				"res://images/agents/thinking/elliot_thinking3.png",
+				"res://images/agents/thinking/elliot_thinking4.png"
+			]
+		},
+		"waiting": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/approval/elliot_approval1.png",
+				"res://images/agents/approval/elliot_approval2.png",
+				"res://images/agents/approval/elliot_approval3.png",
+				"res://images/agents/approval/elliot_approval4.png"
+			]
+		},
+		"working": {
+			"fps": 6.0,
+			"frames": [
+				"res://images/agents/working/Elliot_working1.png",
+				"res://images/agents/working/Elliot_working2.png",
+				"res://images/agents/working/Elliot_working3.png",
+				"res://images/agents/working/Elliot_working4.png"
+			]
+		}
+	},
+	"opencode_agent": "",
+	"project": ""
+}

@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/chat_panel.tscn" id="4_chat"]
 [ext_resource type="PackedScene" path="res://scenes/ui/agent_editor.tscn" id="5_edit"]
 [ext_resource type="PackedScene" path="res://scenes/ui/agent_request_dialog.tscn" id="6_request"]
+[ext_resource type="Texture2D" path="res://myagents_wp.png" id="7_splash"]
 
 [node name="Main" type="Control" unique_id=1962188244]
 layout_mode = 3
@@ -73,6 +74,17 @@ grow_vertical = 2
 mouse_filter = 0
 visible = false
 
+[node name="SplashBg" type="TextureRect" parent="LoadingOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("7_splash")
+expand_mode = 1
+stretch_mode = 6
+
 [node name="Dim" type="ColorRect" parent="LoadingOverlay"]
 layout_mode = 1
 anchors_preset = 15
@@ -80,7 +92,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.55)
+color = Color(0, 0, 0, 0.45)
 
 [node name="Center" type="CenterContainer" parent="LoadingOverlay"]
 layout_mode = 1
@@ -104,3 +116,11 @@ layout_mode = 2
 modulate = Color(0.7, 0.72, 0.78, 1)
 text = "Preparing models and skills..."
 horizontal_alignment = 1
+
+[node name="LoadingProgress" type="ProgressBar" parent="LoadingOverlay/Center/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(420, 22)
+layout_mode = 2
+max_value = 1.0
+step = 0.001
+show_percentage = true
