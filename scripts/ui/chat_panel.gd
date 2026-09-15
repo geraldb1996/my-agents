@@ -24,6 +24,8 @@ var _filter_name := ""
 var _opt_ids: Array[String] = []
 var _copy_menu: PopupMenu
 var _copy_content := ""
+var _mention_menu: PopupMenu
+var _mention_tokens: Array[String] = []
 
 
 func _ready() -> void:
@@ -32,6 +34,7 @@ func _ready() -> void:
 	%ClearDialog.confirmed.connect(_on_clear_confirmed)
 	%AgentFilter.item_selected.connect(_on_filter_selected)
 	input_edit.text_submitted.connect(func(_t): _on_send_pressed())
+	input_edit.text_changed.connect(_on_input_changed)
 	EventBus.chat_message.connect(_on_chat_message)
 	EventBus.agent_state_changed.connect(_on_state_changed)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
@@ -195,7 +198,81 @@ func _on_copy_id(_id: int) -> void:
 	DisplayServer.clipboard_set(_copy_content)
 
 
+func _on_input_changed(_new_text: String) -> void:
+	var text := input_edit.text
+	var caret := input_edit.caret_column
+	if caret > text.length():
+		caret = text.length()
+	var before := text.substr(0, caret)
+	var at := before.rfind("@")
+	if at < 0:
+		_hide_mention_menu()
+		return
+	var query := before.substr(at + 1)
+	if query.contains(" ") or query.contains("\t"):
+		_hide_mention_menu()
+		return
+	if _show_mention_menu(query):
+		input_edit.grab_focus()
+
+
+func _show_mention_menu(query: String) -> bool:
+	if _mention_menu == null:
+		_mention_menu = PopupMenu.new()
+		_mention_menu.set_flag(Window.FLAG_NO_FOCUS, true)
+		_mention_menu.id_pressed.connect(_on_mention_id_pressed)
+		add_child(_mention_menu)
+	_mention_menu.clear()
+	_mention_tokens.clear()
+	var q := query.to_lower()
+	_add_mention_entry("all", "All agents", q)
+	for agent_id in ProfileStore.profiles:
+		var profile := ProfileStore.get_profile(agent_id)
+		if profile != null:
+			_add_mention_entry(profile.name.replace(" ", "_"), profile.name, q)
+	if _mention_tokens.is_empty():
+		_hide_mention_menu()
+		return false
+	if not _mention_menu.visible:
+		var rect := input_edit.get_global_rect()
+		_mention_menu.popup(Rect2i(Vector2i(rect.position.x, rect.end.y), Vector2i(int(rect.size.x), 0)))
+	return true
+
+
+func _add_mention_entry(token: String, label: String, query: String) -> void:
+	if not query.is_empty() and not token.to_lower().contains(query) and not label.to_lower().contains(query):
+		return
+	var id := _mention_tokens.size()
+	_mention_tokens.append(token)
+	_mention_menu.add_item(label, id)
+
+
+func _on_mention_id_pressed(id: int) -> void:
+	if id < 0 or id >= _mention_tokens.size():
+		return
+	var token := _mention_tokens[id]
+	var text := input_edit.text
+	var caret := input_edit.caret_column
+	if caret > text.length():
+		caret = text.length()
+	var before := text.substr(0, caret)
+	var at := before.rfind("@")
+	if at < 0:
+		return
+	var insert := "@%s " % token
+	input_edit.text = text.substr(0, at) + insert + text.substr(caret)
+	input_edit.caret_column = at + insert.length()
+	input_edit.grab_focus()
+	_hide_mention_menu()
+
+
+func _hide_mention_menu() -> void:
+	if _mention_menu != null and _mention_menu.visible:
+		_mention_menu.hide()
+
+
 func _on_send_pressed() -> void:
+	_hide_mention_menu()
 	var text := input_edit.text.strip_edges()
 	if text.is_empty():
 		return

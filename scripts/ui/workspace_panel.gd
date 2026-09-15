@@ -10,12 +10,15 @@ extends PanelContainer
 @onready var git_label: Label = %GitLabel
 @onready var output_log: RichTextLabel = %OutputLog
 @onready var output_scroll: ScrollContainer = %OutputScroll
-@onready var temp_skill_edit: LineEdit = %TempSkillEdit
+@onready var temp_skill_select: OptionButton = %TempSkillSelect
+@onready var temp_skills_box: VBoxContainer = %TempSkillsBox
+@onready var temp_skill_dialog: TempSkillDialog = %TempSkillDialog
 @onready var project_dialog: FileDialog = %ProjectDialog
 @onready var agent_name_label: Label = %AgentNameLabel
 @onready var skill_source_option: OptionButton = %SkillSourceOption
 
 var _current_id: String = ""
+var _skills_project: String = ""
 
 
 func _ready() -> void:
@@ -23,6 +26,7 @@ func _ready() -> void:
 	%SelectProjectButton.pressed.connect(_on_select_project_pressed)
 	%StartStopButton.pressed.connect(_on_start_stop_pressed)
 	%TempSkillButton.pressed.connect(_on_temp_skill_pressed)
+	%ClearTempSkillsButton.pressed.connect(_on_clear_temp_skills_pressed)
 	project_dialog.dir_selected.connect(_on_project_selected)
 	project_path_edit.text_submitted.connect(_on_project_path_submitted)
 	EventBus.agent_selected.connect(_on_agent_selected)
@@ -31,7 +35,11 @@ func _ready() -> void:
 	EventBus.agent_files_changed.connect(_on_files_changed)
 	EventBus.agent_git_status.connect(_on_git_status)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
+	EventBus.temp_skills_changed.connect(_on_temp_skills_changed)
 	skill_source_option.item_selected.connect(_on_skill_source_selected)
+	temp_skill_select.item_selected.connect(_on_temp_skill_selected)
+	temp_skill_dialog.skill_added.connect(_on_temp_skill_added)
+	SkillCatalog.skills_loaded.connect(_on_skills_loaded)
 	_populate_skill_source_options()
 	clear()
 
@@ -51,6 +59,7 @@ func clear() -> void:
 	%SelectProjectButton.disabled = true
 	character_view.set_profile(null)
 	character_view.set_state("offline")
+	_clear_temp_skill_rows()
 
 
 func _on_agent_selected(profile: AgentProfile) -> void:
@@ -67,6 +76,13 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	output_log.clear()
 	for line in AgentManager.get_output_history(profile.id):
 		_append_output(str(line))
+	var project := profile.project
+	if _skills_project != project:
+		_skills_project = project
+		SkillCatalog.refresh(project)
+	else:
+		_populate_temp_skill_select()
+	_refresh_temp_skills()
 	AgentManager.queue_git_refresh(profile.id, 0.3)
 
 
@@ -168,6 +184,8 @@ func _apply_project(path: String) -> void:
 	project_path_edit.text = path
 	project_path_edit.tooltip_text = path
 	%SendButton.disabled = path.is_empty()
+	_skills_project = path
+	SkillCatalog.refresh(path)
 	AgentManager.queue_git_refresh(_current_id, 0.3)
 	EventBus.agent_output.emit(_current_id, "[project] set to %s" % path)
 
@@ -188,15 +206,106 @@ func _populate_skill_source_options() -> void:
 	skill_source_option.add_item("Local", 2)
 
 
-func _on_skill_source_selected(index: int) -> void:
-	pass
+func _current_skill_source() -> String:
+	match skill_source_option.selected:
+		1:
+			return "global"
+		2:
+			return "local"
+		_:
+			return "all"
+
+
+func _on_skill_source_selected(_index: int) -> void:
+	_populate_temp_skill_select()
+
+
+func _on_skills_loaded() -> void:
+	if _current_id.is_empty():
+		return
+	_populate_temp_skill_select()
+	_refresh_temp_skills()
+
+
+func _populate_temp_skill_select() -> void:
+	temp_skill_select.clear()
+	temp_skill_select.add_item("Installed skills...", 0)
+	for skill in SkillCatalog.get_skills_by_source(_current_skill_source()):
+		temp_skill_select.add_item(skill)
+	temp_skill_select.select(0)
+
+
+func _on_temp_skill_selected(index: int) -> void:
+	if index <= 0 or _current_id.is_empty():
+		return
+	var skill := temp_skill_select.get_item_text(index)
+	AgentManager.add_temp_skill(_current_id, skill, SkillCatalog.read_skill(skill), SkillCatalog.get_skill_source(skill))
+	temp_skill_select.select(0)
 
 
 func _on_temp_skill_pressed() -> void:
 	if _current_id.is_empty():
 		return
-	var skill := temp_skill_edit.text.strip_edges()
-	if skill.is_empty():
+	temp_skill_dialog.open()
+
+
+func _on_temp_skill_added(entry: Dictionary) -> void:
+	if _current_id.is_empty():
 		return
-	AgentManager.add_temp_skill(_current_id, skill)
-	temp_skill_edit.clear()
+	AgentManager.add_temp_skill(
+		_current_id,
+		str(entry.get("name", "")),
+		str(entry.get("content", "")),
+		str(entry.get("source", ""))
+	)
+
+
+func _on_temp_skills_changed(agent_id: String) -> void:
+	if agent_id == _current_id:
+		_refresh_temp_skills()
+
+
+func _on_clear_temp_skills_pressed() -> void:
+	if _current_id.is_empty():
+		return
+	AgentManager.clear_temp_skills(_current_id)
+
+
+func _clear_temp_skill_rows() -> void:
+	for child in temp_skills_box.get_children():
+		child.queue_free()
+	%ClearTempSkillsButton.disabled = true
+
+
+func _refresh_temp_skills() -> void:
+	_clear_temp_skill_rows()
+	var profile := ProfileStore.get_profile(_current_id)
+	if profile == null:
+		return
+	for i in profile.temp_skills.size():
+		temp_skills_box.add_child(_build_temp_skill_row(profile.temp_skills[i], i))
+	%ClearTempSkillsButton.disabled = profile.temp_skills.is_empty()
+
+
+func _build_temp_skill_row(entry: Dictionary, index: int) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	var name := str(entry.get("name", ""))
+	var source := str(entry.get("source", ""))
+	label.text = name if source.is_empty() else "%s (%s)" % [name, source]
+	var content := str(entry.get("content", ""))
+	label.tooltip_text = content.substr(0, 500)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	row.add_child(label)
+	var remove := Button.new()
+	remove.text = "x"
+	remove.pressed.connect(_on_remove_temp_skill.bind(index))
+	row.add_child(remove)
+	return row
+
+
+func _on_remove_temp_skill(index: int) -> void:
+	if _current_id.is_empty():
+		return
+	AgentManager.remove_temp_skill(_current_id, index)

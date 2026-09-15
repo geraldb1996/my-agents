@@ -22,6 +22,8 @@ const TASK_NO_PROJECT := 1
 const TASK_BUSY := 2
 const TASK_LAUNCH_FAILED := 3
 
+const ACTIVE_STATES := ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval"]
+
 var sessions: Dictionary = {}
 var selected_agent_id: String = ""
 
@@ -116,6 +118,7 @@ func send_chat_message(agent_id: String, content: String) -> int:
 
 func delete_session(agent_id: String) -> void:
 	_detach_runner(agent_id)
+	_reset_temp_skills(agent_id)
 	emit_output(agent_id, "[session] deleted — next task starts fresh")
 	set_state(agent_id, "offline")
 
@@ -123,8 +126,18 @@ func delete_session(agent_id: String) -> void:
 func new_session(agent_id: String) -> void:
 	_archive_session(agent_id)
 	_detach_runner(agent_id)
+	_reset_temp_skills(agent_id)
 	emit_output(agent_id, "[session] new session — previous kept in history")
 	set_state(agent_id, "offline")
+
+
+func _reset_temp_skills(agent_id: String) -> void:
+	var profile := get_profile(agent_id)
+	if profile == null or not profile.has_temp_skills():
+		return
+	profile.temp_skills.clear()
+	emit_output(agent_id, "[skills] temp skills cleared for new session")
+	EventBus.temp_skills_changed.emit(agent_id)
 
 
 func switch_session(agent_id: String, opencode_session_id: String) -> void:
@@ -141,6 +154,7 @@ func switch_session(agent_id: String, opencode_session_id: String) -> void:
 	var session := get_session(agent_id)
 	session["opencode_session"] = opencode_session_id
 	ProfileStore.save_session(agent_id, session)
+	_reset_temp_skills(agent_id)
 	emit_output(agent_id, "[session] switched to %s" % opencode_session_id)
 	set_state(agent_id, "offline")
 
@@ -202,12 +216,25 @@ func set_variant(agent_id: String, variant: String) -> void:
 	EventBus.profile_saved.emit(profile)
 
 
-func add_temp_skill(agent_id: String, skill: String) -> void:
+func add_temp_skill(agent_id: String, skill: String, content: String = "", source: String = "") -> void:
 	var profile := get_profile(agent_id)
 	if profile == null:
 		return
-	profile.add_temp_skill(skill)
+	profile.add_temp_skill(skill, content, source)
 	emit_output(agent_id, "[skills] temp skill added: %s" % skill)
+	EventBus.temp_skills_changed.emit(agent_id)
+
+
+func remove_temp_skill(agent_id: String, index: int) -> void:
+	var profile := get_profile(agent_id)
+	if profile == null:
+		return
+	var name := ""
+	if index >= 0 and index < profile.temp_skills.size():
+		name = str(profile.temp_skills[index].get("name", ""))
+	profile.remove_temp_skill(index)
+	emit_output(agent_id, "[skills] temp skill removed: %s" % name)
+	EventBus.temp_skills_changed.emit(agent_id)
 
 
 func clear_temp_skills(agent_id: String) -> void:
@@ -216,6 +243,7 @@ func clear_temp_skills(agent_id: String) -> void:
 		return
 	profile.temp_skills.clear()
 	emit_output(agent_id, "[skills] temp skills cleared")
+	EventBus.temp_skills_changed.emit(agent_id)
 
 
 func set_state(agent_id: String, state: String) -> void:
@@ -253,9 +281,9 @@ func _ensure_session_titles() -> void:
 	_session_titles.clear()
 	var output: Array = []
 	var cmd := "opencode session list --format json -n 300 </dev/null"
-	if OS.execute("bash", ["-c", cmd], output, true, false) != OK:
+	if OS.execute("bash", ["-c", cmd], output, false, false) != OK:
 		return
-	var parsed = JSON.parse_string("\n".join(output))
+	var parsed = JSON.parse_string(_extract_json("\n".join(output)))
 	if parsed is not Array:
 		return
 	for entry in parsed:
@@ -263,6 +291,21 @@ func _ensure_session_titles() -> void:
 			var id := str(entry.get("id", ""))
 			if not id.is_empty():
 				_session_titles[id] = str(entry.get("title", ""))
+
+
+func _extract_json(text: String) -> String:
+	var start := text.find("[")
+	var start_obj := text.find("{")
+	if start < 0 or (start_obj >= 0 and start_obj < start):
+		start = start_obj
+	if start < 0:
+		return text
+	var open := text[start]
+	var close := "]" if open == "[" else "}"
+	var end := text.rfind(close)
+	if end <= start:
+		return text.substr(start)
+	return text.substr(start, end - start + 1)
 
 
 func emit_chat_error(agent_id: String, message: String) -> void:
@@ -277,6 +320,9 @@ func emit_chat_error(agent_id: String, message: String) -> void:
 func _spawn_runner(agent_id: String, task: String) -> bool:
 	var profile := get_profile(agent_id)
 	var session := get_session(agent_id)
+	_posted_reply[agent_id] = false
+	_pending_response[agent_id] = {}
+	_pending_thinking.erase(agent_id)
 	var runner := OpenCodeRunner.new()
 	runner.name = "Runner_%s" % agent_id
 	add_child(runner)
@@ -293,6 +339,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 		"session_id": str(session.get("opencode_session", "")),
 		"task": task,
 		"skills_context": ", ".join(profile.get_all_skills()),
+		"temp_context": profile.get_temp_context(),
 	})
 	if not started:
 		emit_chat_error(agent_id, "Failed to launch opencode CLI. Is it in PATH?")
@@ -310,10 +357,18 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 
 func _on_process_finished(agent_id: String, exit_code: int) -> void:
 	var runner: OpenCodeRunner = _runners.get(agent_id)
+	var stall_ms: int = runner.stall_timeout_ms if runner != null else 120000
 	if runner != null and not runner.running:
 		_runners.erase(agent_id)
 		runner.queue_free()
-	if exit_code != 0:
+	if exit_code == -2:
+		var stall_reason := str(_last_error.get(agent_id, ""))
+		_last_error.erase(agent_id)
+		if stall_reason.is_empty():
+			stall_reason = "No activity for %d s. The model/provider may be unresponsive or rate-limited." % int(stall_ms / 1000)
+		emit_chat_error(agent_id, stall_reason)
+		set_state(agent_id, "error")
+	elif exit_code != 0:
 		var message := str(_last_error.get(agent_id, ""))
 		_last_error.erase(agent_id)
 		if message.is_empty():
@@ -324,6 +379,13 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 		if not _posted_reply.get(agent_id, false):
 			_post_reply(agent_id)
 		emit_output(agent_id, "[end] done")
+	if str(get_session(agent_id).get("state", "")) in ACTIVE_STATES:
+		set_state(agent_id, "idle")
+	var session := get_session(agent_id)
+	if not str(session.get("task", "")).is_empty():
+		session["task"] = ""
+		EventBus.agent_task_updated.emit(agent_id, "")
+		ProfileStore.save_session(agent_id, session)
 	queue_git_refresh(agent_id, 0.5)
 
 
@@ -372,11 +434,39 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 				set_state(agent_id, "working")
 		_:
 			if etype == "stderr":
-				emit_output(agent_id, "[stderr] " + str(event.get("line", "")))
+				_handle_stderr(agent_id, str(event.get("line", "")))
 			elif etype == "error":
 				_capture_error(agent_id, event)
 			elif etype.contains("permission"):
 				set_state(agent_id, "approval")
+
+
+func _handle_stderr(agent_id: String, line: String) -> void:
+	if not line.contains("level=ERROR"):
+		return
+	var message := _extract_log_message(line)
+	if message.is_empty():
+		return
+	emit_output(agent_id, "[stderr] " + message)
+	_last_error[agent_id] = message
+
+
+func _extract_log_message(line: String) -> String:
+	var msg := ""
+	var re_message := RegEx.new()
+	re_message.compile('message=(?:"([^"]*)"|([^\\s]+))')
+	var m := re_message.search(line)
+	if m != null:
+		msg = m.get_string(1) if not m.get_string(1).is_empty() else m.get_string(2)
+	var re_error := RegEx.new()
+	re_error.compile('error\\.error="([^"]*)"')
+	var e := re_error.search(line)
+	if e != null:
+		var detail := e.get_string(1)
+		msg = detail if msg.is_empty() else "%s — %s" % [msg, detail]
+	if msg.is_empty():
+		msg = line
+	return msg
 
 
 func _capture_error(agent_id: String, event: Dictionary) -> void:
@@ -476,13 +566,15 @@ func _finish_task(agent_id: String) -> void:
 func _post_reply(agent_id: String) -> void:
 	if _posted_reply.get(agent_id, false):
 		return
-	var reply := ""
+	var chunks: Array[String] = []
 	var parts: Dictionary = _pending_response.get(agent_id, {})
 	for mid in parts:
-		reply = str(parts[mid])
+		var chunk := str(parts[mid]).strip_edges()
+		if not chunk.is_empty():
+			chunks.append(chunk)
 	_pending_response[agent_id] = {}
 	_pending_thinking.erase(agent_id)
-	reply = reply.strip_edges()
+	var reply := "\n\n".join(chunks).strip_edges()
 	if reply.is_empty():
 		return
 	_posted_reply[agent_id] = true

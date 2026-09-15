@@ -17,8 +17,8 @@ general/updates_per_second=30
 config/name="my-agents-team"
 run/main_scene="res://scenes/main/main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
-boot_splash/image="uid://y7kjhmklain6"
-config/icon="uid://y7kjhmklain6"
+boot_splash/image="res://images/agents/agent.png"
+config/icon="res://images/agents/agent.png"
 
 [autoload]
 

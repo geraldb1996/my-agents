@@ -13,7 +13,9 @@ var opencode_agent: String = ""
 var session_id: String = ""
 var task: String = ""
 var skills_context: String = ""
+var temp_context: String = ""
 var running: bool = false
+var stall_timeout_ms: int = 120000
 
 var _pid: int = -1
 var _out_path: String = ""
@@ -22,6 +24,7 @@ var _buffer: String = ""
 var _err_buffer: String = ""
 var _last_text: String = ""
 var _last_err: String = ""
+var _last_activity_ms: int = 0
 var _completed_ok: bool = false
 var _stopped_by_user: bool = false
 
@@ -36,11 +39,12 @@ func start(opts: Dictionary) -> bool:
 	session_id = str(opts.get("session_id", ""))
 	task = str(opts.get("task", ""))
 	skills_context = str(opts.get("skills_context", ""))
+	temp_context = str(opts.get("temp_context", ""))
 
 	if agent_id.is_empty() or project.is_empty():
 		return false
 
-	var args := PackedStringArray(["run", "--format", "json", "--thinking"])
+	var args := PackedStringArray(["run", "--format", "json", "--thinking", "--print-logs"])
 	if not model.is_empty():
 		args.append_array(["-m", model])
 	if not variant.is_empty():
@@ -71,6 +75,7 @@ func start(opts: Dictionary) -> bool:
 	_last_err = ""
 	_completed_ok = false
 	_stopped_by_user = false
+	_last_activity_ms = Time.get_ticks_msec()
 	running = true
 	return true
 
@@ -93,6 +98,18 @@ func poll() -> void:
 	if _pid > 0 and not OS.is_process_running(_pid):
 		running = false
 		process_finished.emit(agent_id, 0 if _completed_ok else -1)
+		return
+
+	if stall_timeout_ms > 0 and Time.get_ticks_msec() - _last_activity_ms > stall_timeout_ms:
+		_stall()
+
+
+func _stall() -> void:
+	if _pid > 0 and OS.is_process_running(_pid):
+		OS.kill(_pid)
+	if running:
+		running = false
+		process_finished.emit(agent_id, -2)
 
 
 func _drain_stream(path: String, is_stderr: bool) -> void:
@@ -103,11 +120,17 @@ func _drain_stream(path: String, is_stderr: bool) -> void:
 	file.close()
 	var buffer := ""
 	if is_stderr:
+		if text == _last_err:
+			return
+		_last_activity_ms = Time.get_ticks_msec()
 		if text.begins_with(_last_err):
 			buffer = _err_buffer + text.substr(_last_err.length())
 		_last_err = text
 		_err_buffer = _consume_lines(buffer, true)
 	else:
+		if text == _last_text:
+			return
+		_last_activity_ms = Time.get_ticks_msec()
 		if text.begins_with(_last_text):
 			buffer = _buffer + text.substr(_last_text.length())
 		_last_text = text
@@ -127,6 +150,9 @@ func _build_prompt() -> String:
 		parts.append(intro)
 		if not skills_context.is_empty():
 			parts.append("Your skills: %s" % skills_context)
+		parts.append("RESPONSE FORMAT (mandatory): always start your final reply with 'CHAT:' followed by your message, for example: CHAT: your reply here. Never respond without this prefix.")
+	if not temp_context.is_empty():
+		parts.append("Temporary skill instructions (session only):\n%s" % temp_context)
 	if not task.is_empty():
 		parts.append(task)
 	return "\n".join(parts)

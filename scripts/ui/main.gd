@@ -26,7 +26,11 @@ func _start_initial_loading() -> void:
 	loading_overlay.visible = true
 	await get_tree().process_frame
 	ModelCatalog.refresh()
-	SkillCatalog.refresh()
+	var project := ""
+	var profile := ProfileStore.get_profile(AgentManager.selected_agent_id)
+	if profile != null:
+		project = profile.project
+	SkillCatalog.refresh(project)
 
 
 func _on_catalog_loaded() -> void:

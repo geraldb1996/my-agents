@@ -21,7 +21,7 @@ const DEFAULT_CHARACTER := "res://images/agents/agent.png"
 @export var created_at: int = 0
 @export var updated_at: int = 0
 
-var temp_skills: Array[String] = []
+var temp_skills: Array[Dictionary] = []
 
 
 func ensure_id() -> void:
@@ -30,19 +30,46 @@ func ensure_id() -> void:
 
 
 func get_all_skills() -> Array[String]:
-	var all := skills.duplicate()
-	for s in temp_skills:
-		if not all.has(s):
-			all.append(s)
+	var all: Array[String] = skills.duplicate()
+	for entry in temp_skills:
+		var name := str(entry.get("name", ""))
+		if not name.is_empty() and not all.has(name):
+			all.append(name)
 	return all
 
 
-func add_temp_skill(skill: String) -> void:
+func add_temp_skill(skill: String, content: String = "", source: String = "") -> void:
 	var trimmed := skill.strip_edges()
 	if trimmed.is_empty():
-		return
-	if not temp_skills.has(trimmed):
-		temp_skills.append(trimmed)
+		trimmed = "Custom instructions"
+	for entry in temp_skills:
+		if str(entry.get("name", "")) == trimmed and str(entry.get("source", "")) == source:
+			entry["content"] = content
+			return
+	temp_skills.append({"name": trimmed, "source": source, "content": content})
+
+
+func remove_temp_skill(index: int) -> void:
+	if index >= 0 and index < temp_skills.size():
+		temp_skills.remove_at(index)
+
+
+func has_temp_skills() -> bool:
+	return not temp_skills.is_empty()
+
+
+func get_temp_context() -> String:
+	var blocks: Array[String] = []
+	for entry in temp_skills:
+		var content := str(entry.get("content", "")).strip_edges()
+		if content.is_empty():
+			continue
+		var name := str(entry.get("name", ""))
+		if name.is_empty():
+			blocks.append(content)
+		else:
+			blocks.append("### %s\n%s" % [name, content])
+	return "\n\n".join(blocks)
 
 
 func to_dict() -> Dictionary:

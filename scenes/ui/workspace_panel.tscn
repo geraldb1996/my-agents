@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/workspace_panel.gd" id="1_ws"]
 [ext_resource type="PackedScene" path="res://scenes/ui/character_view.tscn" id="2_char"]
+[ext_resource type="PackedScene" path="res://scenes/ui/temp_skill_dialog.tscn" id="3_tsd"]
 
 [sub_resource type="StyleBoxFlat" id="sb_panel"]
 bg_color = Color(0.12, 0.13, 0.16, 1)
@@ -100,16 +101,36 @@ popup/item_1/id = 1
 popup/item_2/text = "Local"
 popup/item_2/id = 2
 
-[node name="TempSkillEdit" type="LineEdit" parent="Root/StateRow"]
+[node name="TempSkillSelect" type="OptionButton" parent="Root/StateRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-placeholder_text = "temp skill..."
+tooltip_text = "Pick an installed skill to use temporarily"
 
 [node name="TempSkillButton" type="Button" parent="Root/StateRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "+Skill"
+tooltip_text = "Load a .md/.txt file or type temporary instructions"
+
+[node name="TempSkillsRow" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="TempSkillsTitle" type="Label" parent="Root/TempSkillsRow"]
+layout_mode = 2
+modulate = Color(0.7, 0.72, 0.78, 1)
+text = "Temp skills"
+
+[node name="TempSkillsBox" type="VBoxContainer" parent="Root/TempSkillsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ClearTempSkillsButton" type="Button" parent="Root/TempSkillsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Clear"
 
 [node name="CharacterView" parent="Root" instance=ExtResource("2_char")]
 unique_name_in_owner = true
@@ -193,3 +214,6 @@ unique_name_in_owner = true
 file_mode = 2
 access = 2
 title = "Select Project Folder"
+
+[node name="TempSkillDialog" parent="." instance=ExtResource("3_tsd")]
+unique_name_in_owner = true

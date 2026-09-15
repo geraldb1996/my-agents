@@ -255,7 +255,7 @@ func _on_skill_item_selected(index: int) -> void:
 
 
 func _on_refresh_skills_pressed() -> void:
-	SkillCatalog.refresh()
+	SkillCatalog.refresh(_project_path)
 
 
 func _on_skills_loaded() -> void:

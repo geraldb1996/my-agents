@@ -45,9 +45,16 @@ func _ready() -> void:
 
 func _load_first_session() -> bool:
 	var output: Array = []
-	if OS.execute("bash", ["-c", "opencode session list --format json -n 1 </dev/null"], output, true, false) != OK:
+	if OS.execute("bash", ["-c", "opencode session list --format json -n 1 </dev/null"], output, false, false) != OK:
 		return false
-	var parsed = JSON.parse_string("\n".join(output))
+	var text := "\n".join(output)
+	var start := text.find("[")
+	if start < 0:
+		return false
+	var end := text.rfind("]")
+	if end <= start:
+		return false
+	var parsed = JSON.parse_string(text.substr(start, end - start + 1))
 	if not (parsed is Array) or parsed.is_empty():
 		return false
 	var entry: Dictionary = parsed[0]

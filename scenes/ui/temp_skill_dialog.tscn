@@ -1,0 +1,120 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/temp_skill_dialog.gd" id="1_tsd"]
+
+[node name="TempSkillDialog" type="Window"]
+title = "Temporary Skill"
+size = Vector2i(560, 540)
+visible = false
+exclusive = true
+script = ExtResource("1_tsd")
+
+[node name="Margin" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Form" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Margin/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Temporary Skill"
+
+[node name="Hint" type="Label" parent="Margin/Form"]
+layout_mode = 2
+modulate = Color(0.65, 0.68, 0.74, 1)
+autowrap_mode = 2
+text = "This context applies only to the current session and is not saved."
+
+[node name="InstalledLabel" type="Label" parent="Margin/Form"]
+layout_mode = 2
+text = "Installed skills (opencode global / project local)"
+
+[node name="SkillRow" type="HBoxContainer" parent="Margin/Form"]
+layout_mode = 2
+
+[node name="SourceOption" type="OptionButton" parent="Margin/Form/SkillRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+item_count = 3
+popup/item_0/text = "All skills"
+popup/item_0/id = 0
+popup/item_1/text = "Global"
+popup/item_1/id = 1
+popup/item_2/text = "Local (project)"
+popup/item_2/id = 2
+
+[node name="SkillSelect" type="OptionButton" parent="Margin/Form/SkillRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FileLabel" type="Label" parent="Margin/Form"]
+layout_mode = 2
+text = "Or load a .md / .txt file"
+
+[node name="FileRow" type="HBoxContainer" parent="Margin/Form"]
+layout_mode = 2
+
+[node name="LoadFileButton" type="Button" parent="Margin/Form/FileRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Load file..."
+
+[node name="FilePathLabel" type="Label" parent="Margin/Form/FileRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "No file loaded"
+text_overrun_behavior = 3
+modulate = Color(0.7, 0.72, 0.78, 1)
+
+[node name="InstructionsLabel" type="Label" parent="Margin/Form"]
+layout_mode = 2
+text = "Or type instructions"
+
+[node name="NameEdit" type="LineEdit" parent="Margin/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Label (optional)"
+
+[node name="TextEdit" type="TextEdit" parent="Margin/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_vertical = 3
+placeholder_text = "Extra instructions to inject as temporary skill context..."
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Form"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="CloseButton" type="Button" parent="Margin/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Close"
+
+[node name="AddInstructionsButton" type="Button" parent="Margin/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Add instructions"
+
+[node name="TempFileDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+size = Vector2i(600, 420)
+title = "Load skill instructions"
+initial_position = 2
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.md, *.markdown, *.txt ; Instructions")
