@@ -17,6 +17,9 @@ extends PanelContainer
 @onready var project_dialog: FileDialog = %ProjectDialog
 @onready var agent_name_label: Label = %AgentNameLabel
 @onready var skill_source_option: OptionButton = %SkillSourceOption
+@onready var task_label: RichTextLabel = %TaskLabel
+
+const TASK_PLACEHOLDER := "(Sin tarea asignada)"
 
 var _current_id: String = ""
 var _skills_project: String = ""
@@ -42,6 +45,7 @@ func _ready() -> void:
 	EventBus.agent_git_status.connect(_on_git_status)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
 	EventBus.temp_skills_changed.connect(_on_temp_skills_changed)
+	EventBus.agent_task_updated.connect(_on_task_updated)
 	skill_source_option.item_selected.connect(_on_skill_source_selected)
 	temp_skill_select.item_selected.connect(_on_temp_skill_selected)
 	temp_skill_dialog.skill_added.connect(_on_temp_skill_added)
@@ -59,6 +63,7 @@ func clear() -> void:
 	git_label.text = "--"
 	files_label.text = "--"
 	task_edit.text = ""
+	_update_task_label("")
 	output_log.text = ""
 	expanded_output_log.text = ""
 	output_dialog.hide()
@@ -82,6 +87,7 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	%SendButton.disabled = profile.project.is_empty()
 	var session := AgentManager.get_session(profile.id)
 	state_label.text = str(session.get("state", "offline")).capitalize()
+	_update_task_label(str(session.get("task", "")))
 	output_log.text = ""
 	expanded_output_log.text = ""
 	output_dialog.title = "Output — " + profile.name
@@ -109,6 +115,16 @@ func _on_state_changed(agent_id: String, state: String) -> void:
 	var active := state in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval", "success"]
 	start_stop_button.text = "Stop" if active else "Start"
 	start_stop_button.disabled = false
+
+
+func _on_task_updated(agent_id: String, task: String) -> void:
+	if agent_id != _current_id:
+		return
+	_update_task_label(task)
+
+
+func _update_task_label(task: String) -> void:
+	task_label.text = task if not task.is_empty() else TASK_PLACEHOLDER
 
 
 func _on_output(agent_id: String, line: String) -> void:
@@ -171,13 +187,13 @@ func _render_files_status(files: Dictionary) -> void:
 	for path in files:
 		var op := str(files[path])
 		var color: Color = AgentManager._file_op_colors.get(op, Color.WHITE)
-		lines.append("[color=#%s]%s[/color] %s" % [color.to_html(false), op, path])
+		lines.append("[color=#%s](%s)[/color] %s" % [color.to_html(false), op, path])
 	files_label.text = "\n".join(lines)
 	files_label.tooltip_text = _status_legend()
 
 
 func _status_legend() -> String:
-	return "R (white): read - D (red): deleted - C (blue): created - M (yellow): modified"
+	return "(R) (white): read - (D) (red): deleted - (C) (blue): created - (M) (yellow): modified"
 
 
 func _on_git_status(agent_id: String, branch: String, status: String) -> void:

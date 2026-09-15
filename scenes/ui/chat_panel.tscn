@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cn1mkwnr8t2gq"]
 
 [ext_resource type="Script" uid="uid://bxtq70oyut3dv" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
+[ext_resource type="AudioStreamWAV" uid="uid://00jny4c3h66i" path="res://ui_snd/msg.wav" id="2_snd"]
 
 [sub_resource type="StyleBoxFlat" id="sb_panel"]
 content_margin_left = 10.0
@@ -101,3 +102,8 @@ text = "Send"
 unique_name_in_owner = true
 title = "Clear chat history"
 dialog_text = "Delete all chat messages? This cannot be undone."
+
+[node name="MsgSound" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+stream = ExtResource("2_snd")
+volume_db = -6.0

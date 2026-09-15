@@ -18,6 +18,7 @@ const TYPING_STATES := ["thinking", "working", "reading", "coding", "terminal", 
 @onready var scroll: ScrollContainer = %Scroll
 @onready var typing_label: Label = %TypingLabel
 @onready var input_edit: LineEdit = %InputEdit
+@onready var _msg_sound: AudioStreamPlayer = %MsgSound
 
 var _typing: Dictionary = {}
 var _filter_name := ""
@@ -28,6 +29,8 @@ var _mention_menu: PopupMenu
 var _mention_tokens: Array[String] = []
 var _message_dialog: AcceptDialog
 var _message_body: RichTextLabel
+var _message_avatar: CharacterAvatar
+var _dialog_agent_id := ""
 
 
 func _ready() -> void:
@@ -107,6 +110,8 @@ func _populate_history() -> void:
 func _on_chat_message(sender: String, content: String, _mentions: Array, timestamp: int, is_agent: bool) -> void:
 	if not _passes_filter(sender, is_agent):
 		return
+	if is_agent:
+		_play_msg_sound()
 	_add_bubble(sender, content, timestamp, is_agent)
 	_autoscroll()
 
@@ -114,6 +119,7 @@ func _on_chat_message(sender: String, content: String, _mentions: Array, timesta
 func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool) -> void:
 	var is_user := sender == "user"
 	var is_system := sender == "system"
+	var agent_id := _find_agent_id_by_name(sender) if is_agent else ""
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -172,7 +178,7 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	bubble.add_child(inner)
 	row.add_child(bubble)
 	bubble.tooltip_text = "Double-click to enlarge message"
-	bubble.gui_input.connect(_on_bubble_gui_input.bind(content, sender_label.text, timestamp))
+	bubble.gui_input.connect(_on_bubble_gui_input.bind(content, sender_label.text, timestamp, agent_id))
 
 	if not is_user:
 		var spacer_right := Control.new()
@@ -182,18 +188,18 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	messages_box.add_child(row)
 
 
-func _on_bubble_gui_input(event: InputEvent, content: String, sender: String, timestamp: int) -> void:
+func _on_bubble_gui_input(event: InputEvent, content: String, sender: String, timestamp: int, agent_id: String) -> void:
 	if not event is InputEventMouseButton or not event.pressed:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 		accept_event()
-		_show_message_dialog(content, sender, timestamp)
+		_show_message_dialog(content, sender, timestamp, agent_id)
 	elif event.button_index == MOUSE_BUTTON_RIGHT:
 		_copy_content = content
 		_show_copy_menu()
 
 
-func _show_message_dialog(content: String, sender: String, timestamp: int) -> void:
+func _show_message_dialog(content: String, sender: String, timestamp: int, agent_id: String) -> void:
 	if _message_dialog == null:
 		_message_dialog = AcceptDialog.new()
 		_message_dialog.name = "MessageDialog"
@@ -205,18 +211,49 @@ func _show_message_dialog(content: String, sender: String, timestamp: int) -> vo
 		style.set_corner_radius_all(10)
 		style.set_content_margin_all(18.0)
 		_message_dialog.add_theme_stylebox_override("panel", style)
+		var layout := VBoxContainer.new()
+		_message_avatar = CharacterAvatar.new()
+		_message_avatar.custom_minimum_size = Vector2(160, 160)
+		_message_avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		layout.add_child(_message_avatar)
 		_message_body = RichTextLabel.new()
 		_message_body.bbcode_enabled = false
 		_message_body.selection_enabled = true
 		_message_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_message_body.add_theme_font_size_override("normal_font_size", 20)
-		_message_dialog.add_child(_message_body)
+		_message_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		layout.add_child(_message_body)
+		_message_dialog.add_child(layout)
 		add_child(_message_dialog)
+	_dialog_agent_id = agent_id
 	_message_dialog.title = "Team Chat — %s %s" % [sender, _format_time(timestamp)]
 	_message_body.text = content
+	_sync_dialog_avatar()
 	_message_dialog.popup_centered_clamped(Vector2i(800, 600), 0.9)
 	_message_body.scroll_to_line(0)
 	_message_body.grab_focus()
+
+
+func _sync_dialog_avatar() -> void:
+	if _message_avatar == null or _message_dialog == null:
+		return
+	var profile := ProfileStore.get_profile(_dialog_agent_id) if not _dialog_agent_id.is_empty() else null
+	if profile == null:
+		_message_avatar.visible = false
+		return
+	_message_avatar.visible = true
+	_message_avatar.set_profile(profile)
+	var state := str(AgentManager.get_session(_dialog_agent_id).get("state", "idle"))
+	_message_avatar.set_state(state)
+
+
+func _find_agent_id_by_name(sender: String) -> String:
+	var lower := sender.to_lower()
+	for agent_id in ProfileStore.profiles:
+		var profile := ProfileStore.get_profile(agent_id)
+		if profile != null and profile.name.to_lower() == lower:
+			return agent_id
+	return ""
 
 
 func _show_copy_menu() -> void:
@@ -389,6 +426,8 @@ func _on_state_changed(agent_id: String, state: String) -> void:
 	else:
 		_typing.erase(agent_id)
 	_update_typing_label()
+	if _message_dialog != null and _message_dialog.visible and agent_id == _dialog_agent_id and _message_avatar != null:
+		_message_avatar.set_state(state)
 
 
 func _on_profile_deleted(agent_id: String) -> void:
@@ -417,6 +456,11 @@ func _update_typing_label() -> void:
 func _autoscroll() -> void:
 	await get_tree().process_frame
 	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
+
+
+func _play_msg_sound() -> void:
+	_msg_sound.stop()
+	_msg_sound.play()
 
 
 func _format_time(ts: int) -> String:

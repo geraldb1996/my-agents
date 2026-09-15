@@ -134,6 +134,7 @@ func _on_session_created(code: int, data: Variant) -> void:
 		_fail("Failed to create opencode session (HTTP %d)" % code)
 		return
 	session_id = str((data as Dictionary)["id"])
+	event_received.emit(agent_id, {"type": "session_created", "sessionID": session_id})
 	_start_stream()
 
 

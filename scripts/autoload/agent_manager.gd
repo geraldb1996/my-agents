@@ -469,14 +469,15 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 		return
 	var session: Dictionary = sessions[agent_id]
 	var etype: String = str(event.get("type", ""))
-	var psession: String = str(event.get("sessionID", ""))
-	if not psession.is_empty() and str(session.get("opencode_session", "")).is_empty():
-		session["opencode_session"] = psession
-		ProfileStore.save_session(agent_id, session)
-
 	var part: Dictionary = event.get("part", {})
 	if part is not Dictionary:
 		part = {}
+	var psession: String = str(event.get("sessionID", ""))
+	if psession.is_empty():
+		psession = str(part.get("sessionID", ""))
+	if not psession.is_empty() and str(session.get("opencode_session", "")).is_empty():
+		session["opencode_session"] = psession
+		ProfileStore.save_session(agent_id, session)
 
 	match etype:
 		"step_start":
@@ -823,10 +824,9 @@ func _refresh_git(agent_id: String) -> void:
 		if i == 0 and line.begins_with("## "):
 			branch = line.substr(3).split("...")[0].split(" ")[0]
 			continue
-		var trimmed := line.strip_edges()
-		if trimmed.is_empty():
+		if line.strip_edges().is_empty():
 			continue
-		if trimmed.length() > 3:
-			files.append(trimmed.substr(3))
+		if line.length() > 3:
+			files.append(line.substr(3))
 	EventBus.agent_git_status.emit(agent_id, branch, text)
 	EventBus.agent_files_changed.emit(agent_id, files)
