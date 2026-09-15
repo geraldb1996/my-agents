@@ -3,6 +3,7 @@ extends PanelContainer
 
 signal new_agent_requested
 signal edit_agent_requested(agent_id: String)
+signal duplicate_agent_requested(agent_id: String)
 signal delete_agent_requested(agent_id: String)
 
 const STATE_LABELS := {
@@ -272,6 +273,8 @@ func _on_context_menu_pressed(index: int) -> void:
 			edit_agent_requested.emit(_context_target)
 		3:
 			delete_agent_requested.emit(_context_target)
+		4:
+			duplicate_agent_requested.emit(_context_target)
 
 func _on_session_menu_pressed(index: int) -> void:
 	if _context_target.is_empty() or index >= _menu_sessions.size():

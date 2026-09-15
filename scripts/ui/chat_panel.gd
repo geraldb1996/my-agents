@@ -26,6 +26,8 @@ var _copy_menu: PopupMenu
 var _copy_content := ""
 var _mention_menu: PopupMenu
 var _mention_tokens: Array[String] = []
+var _message_dialog: AcceptDialog
+var _message_body: RichTextLabel
 
 
 func _ready() -> void:
@@ -169,7 +171,8 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 
 	bubble.add_child(inner)
 	row.add_child(bubble)
-	bubble.gui_input.connect(_on_bubble_gui_input.bind(content))
+	bubble.tooltip_text = "Double-click to enlarge message"
+	bubble.gui_input.connect(_on_bubble_gui_input.bind(content, sender_label.text, timestamp))
 
 	if not is_user:
 		var spacer_right := Control.new()
@@ -179,10 +182,41 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	messages_box.add_child(row)
 
 
-func _on_bubble_gui_input(event: InputEvent, content: String) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+func _on_bubble_gui_input(event: InputEvent, content: String, sender: String, timestamp: int) -> void:
+	if not event is InputEventMouseButton or not event.pressed:
+		return
+	if event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
+		accept_event()
+		_show_message_dialog(content, sender, timestamp)
+	elif event.button_index == MOUSE_BUTTON_RIGHT:
 		_copy_content = content
 		_show_copy_menu()
+
+
+func _show_message_dialog(content: String, sender: String, timestamp: int) -> void:
+	if _message_dialog == null:
+		_message_dialog = AcceptDialog.new()
+		_message_dialog.name = "MessageDialog"
+		_message_dialog.exclusive = true
+		_message_dialog.min_size = Vector2i(320, 240)
+		_message_dialog.ok_button_text = "Close"
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.16, 0.17, 0.22, 1)
+		style.set_corner_radius_all(10)
+		style.set_content_margin_all(18.0)
+		_message_dialog.add_theme_stylebox_override("panel", style)
+		_message_body = RichTextLabel.new()
+		_message_body.bbcode_enabled = false
+		_message_body.selection_enabled = true
+		_message_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_message_body.add_theme_font_size_override("normal_font_size", 20)
+		_message_dialog.add_child(_message_body)
+		add_child(_message_dialog)
+	_message_dialog.title = "Team Chat — %s %s" % [sender, _format_time(timestamp)]
+	_message_body.text = content
+	_message_dialog.popup_centered_clamped(Vector2i(800, 600), 0.9)
+	_message_body.scroll_to_line(0)
+	_message_body.grab_focus()
 
 
 func _show_copy_menu() -> void:

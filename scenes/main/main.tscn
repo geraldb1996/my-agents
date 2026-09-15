@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/workspace_panel.tscn" id="3_ws"]
 [ext_resource type="PackedScene" path="res://scenes/ui/chat_panel.tscn" id="4_chat"]
 [ext_resource type="PackedScene" path="res://scenes/ui/agent_editor.tscn" id="5_edit"]
+[ext_resource type="PackedScene" path="res://scenes/ui/agent_request_dialog.tscn" id="6_request"]
 
 [node name="Main" type="Control" unique_id=1962188244]
 layout_mode = 3
@@ -54,6 +55,10 @@ size_flags_horizontal = 3
 size_flags_stretch_ratio = 3.0
 
 [node name="AgentEditor" parent="." unique_id=609508433 instance=ExtResource("5_edit")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="AgentRequestDialog" parent="." instance=ExtResource("6_request")]
 unique_name_in_owner = true
 layout_mode = 1
 

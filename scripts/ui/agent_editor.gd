@@ -6,7 +6,7 @@ extends Control
 @onready var model_custom_edit: LineEdit = %ModelCustomEdit
 @onready var variant_select: OptionButton = %VariantSelect
 @onready var variant_custom_edit: LineEdit = %VariantCustomEdit
-@onready var opencode_agent_edit: LineEdit = %OpenCodeAgentEdit
+@onready var opencode_agent_select: OptionButton = %OpenCodeAgentSelect
 @onready var personality_edit: TextEdit = %PersonalityEdit
 @onready var skills_box: VBoxContainer = %SkillsBox
 @onready var skill_input: LineEdit = %SkillInput
@@ -26,12 +26,17 @@ var _character_path: String = AgentProfile.DEFAULT_CHARACTER
 var _project_path: String = ""
 var _animations: Dictionary = {}
 var _anim_dialog_state: String = ""
+var _selected_opencode_agent: String = ""
+var _agent_request_id: int = 0
+var _agent_selection_valid: bool = false
 
 
 func _ready() -> void:
 	%AddSkillButton.pressed.connect(_on_add_skill_pressed)
 	%SaveButton.pressed.connect(_on_save_pressed)
 	%CancelButton.pressed.connect(_on_cancel_pressed)
+	%AgentRefreshButton.pressed.connect(_refresh_opencode_agents)
+	opencode_agent_select.item_selected.connect(_on_opencode_agent_selected)
 	%CharacterButton.pressed.connect(func(): character_dialog.popup_centered_ratio(0.5))
 	%ProjectButton.pressed.connect(func(): project_dialog.popup_centered_ratio(0.5))
 	character_dialog.file_selected.connect(_on_character_selected)
@@ -57,7 +62,7 @@ func open_new() -> void:
 func open_profile(profile: AgentProfile) -> void:
 	_editing_id = profile.id
 	name_edit.text = profile.name
-	opencode_agent_edit.text = profile.opencode_agent
+	_selected_opencode_agent = profile.opencode_agent
 	personality_edit.text = profile.personality
 	_character_path = profile.character if not profile.character.is_empty() else AgentProfile.DEFAULT_CHARACTER
 	_project_path = profile.project
@@ -72,9 +77,16 @@ func open_profile(profile: AgentProfile) -> void:
 	visible = true
 
 
+func open_duplicate(profile: AgentProfile) -> void:
+	open_profile(profile)
+	_editing_id = ""
+	name_edit.text = "%s (copy)" % profile.name
+	name_edit.grab_focus()
+
+
 func _populate_defaults() -> void:
 	name_edit.text = ""
-	opencode_agent_edit.text = ""
+	_selected_opencode_agent = ""
 	personality_edit.text = ""
 	_character_path = AgentProfile.DEFAULT_CHARACTER
 	_project_path = ""
@@ -98,6 +110,58 @@ func _ensure_catalogs() -> void:
 		ModelCatalog.refresh()
 	if SkillCatalog.skills.is_empty() and not SkillCatalog.loaded_once:
 		SkillCatalog.refresh()
+
+
+func _refresh_opencode_agents() -> void:
+	_agent_request_id += 1
+	var request_id := _agent_request_id
+	_agent_selection_valid = false
+	opencode_agent_select.clear()
+	opencode_agent_select.add_item("Loading agents...")
+	opencode_agent_select.disabled = true
+	%SaveButton.disabled = true
+	%AgentStatusLabel.text = "Loading agents from OpenCode..."
+	OpenCodeServer.get_agents(_project_path, _on_opencode_agents_loaded.bind(request_id))
+
+
+func _on_opencode_agents_loaded(code: int, data: Variant, request_id: int) -> void:
+	if request_id != _agent_request_id:
+		return
+	opencode_agent_select.clear()
+	opencode_agent_select.add_item("Default (auto)")
+	opencode_agent_select.set_item_metadata(0, "")
+	var names: Array[String] = []
+	var loaded := code == 200 and data is Array
+	if loaded:
+		for entry in data:
+			if entry is Dictionary:
+				var agent_name := str(entry.get("name", "")).strip_edges()
+				if not agent_name.is_empty() and not names.has(agent_name):
+					names.append(agent_name)
+	names.sort()
+	for agent_name in names:
+		opencode_agent_select.add_item(agent_name)
+		opencode_agent_select.set_item_metadata(opencode_agent_select.item_count - 1, agent_name)
+	var selected := names.find(_selected_opencode_agent) + 1
+	_agent_selection_valid = _selected_opencode_agent.is_empty() or selected > 0
+	%AgentStatusLabel.text = "" if loaded else "Could not load agents. Retry Refresh or choose Default (auto)."
+	if not _agent_selection_valid:
+		selected = opencode_agent_select.item_count
+		opencode_agent_select.add_item("Unavailable: " + _selected_opencode_agent)
+		opencode_agent_select.set_item_disabled(selected, true)
+		if loaded:
+			%AgentStatusLabel.text = "Saved agent no longer exists. Select an available agent or Default (auto)."
+	opencode_agent_select.select(selected)
+	opencode_agent_select.disabled = false
+	%SaveButton.disabled = not _agent_selection_valid
+
+
+func _on_opencode_agent_selected(index: int) -> void:
+	if index < 0 or opencode_agent_select.is_item_disabled(index):
+		return
+	_selected_opencode_agent = str(opencode_agent_select.get_item_metadata(index))
+	_agent_selection_valid = true
+	%SaveButton.disabled = false
 
 
 func _on_models_loaded() -> void:
@@ -433,9 +497,12 @@ func _update_character_preview() -> void:
 func _update_project_label() -> void:
 	project_path_edit.text = _project_path
 	project_path_edit.tooltip_text = _project_path
+	_refresh_opencode_agents()
 
 
 func _on_save_pressed() -> void:
+	if not _agent_selection_valid:
+		return
 	var agent_name: String = name_edit.text.strip_edges()
 	if agent_name.is_empty():
 		EventBus.agent_output.emit("", "[error] Agent name is required")
@@ -449,7 +516,7 @@ func _on_save_pressed() -> void:
 		profile.name = agent_name
 		profile.model = model
 		profile.model_variant = variant
-		profile.opencode_agent = opencode_agent_edit.text.strip_edges()
+		profile.opencode_agent = _selected_opencode_agent
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()
 		profile.character = _character_path
@@ -461,7 +528,7 @@ func _on_save_pressed() -> void:
 		profile.name = agent_name
 		profile.model = model
 		profile.model_variant = variant
-		profile.opencode_agent = opencode_agent_edit.text.strip_edges()
+		profile.opencode_agent = _selected_opencode_agent
 		profile.personality = personality_edit.text
 		profile.skills = _collect_skills()
 		profile.character = _character_path

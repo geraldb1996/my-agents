@@ -138,26 +138,31 @@ layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 
-[node name="InfoRow" type="HBoxContainer" parent="Root"]
+[node name="InfoTabs" type="TabContainer" parent="Root"]
+unique_name_in_owner = true
 layout_mode = 2
-
-[node name="FilesBox" type="VBoxContainer" parent="Root/InfoRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="FilesTitle" type="Label" parent="Root/InfoRow/FilesBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "Files"
-
-[node name="FilesScroll" type="ScrollContainer" parent="Root/InfoRow/FilesBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 160)
 size_flags_vertical = 3
-size_flags_stretch_ratio = 0.5
+current_tab = 2
+
+[node name="Files" type="ScrollContainer" parent="Root/InfoTabs"]
+layout_mode = 2
 vertical_scroll_mode = 2
 
-[node name="FilesLabel" type="Label" parent="Root/InfoRow/FilesBox/FilesScroll"]
+[node name="FilesLabel" type="RichTextLabel" parent="Root/InfoTabs/Files"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+bbcode_enabled = true
+fit_content = true
+text = "--"
+
+[node name="Git" type="ScrollContainer" parent="Root/InfoTabs"]
+layout_mode = 2
+vertical_scroll_mode = 2
+
+[node name="GitLabel" type="Label" parent="Root/InfoTabs/Git"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -166,48 +171,53 @@ autowrap_mode = 2
 modulate = Color(0.75, 0.75, 0.8, 1)
 text = "--"
 
-[node name="GitBox" type="VBoxContainer" parent="Root/InfoRow"]
+[node name="Output" type="VBoxContainer" parent="Root/InfoTabs"]
+layout_mode = 2
+
+[node name="OutputHeader" type="HBoxContainer" parent="Root/InfoTabs/Output"]
+layout_mode = 2
+
+[node name="OutputTitle" type="Label" parent="Root/InfoTabs/Output/OutputHeader"]
 layout_mode = 2
 size_flags_horizontal = 3
-
-[node name="GitTitle" type="Label" parent="Root/InfoRow/GitBox"]
-layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "Git"
+text = "Live output"
 
-[node name="GitLabel" type="Label" parent="Root/InfoRow/GitBox"]
+[node name="ExpandOutputButton" type="Button" parent="Root/InfoTabs/Output/OutputHeader"]
 unique_name_in_owner = true
 layout_mode = 2
-modulate = Color(0.75, 0.75, 0.8, 1)
-text = "--"
+text = "+"
+tooltip_text = "Expand live output"
 
-[node name="OutputTitle" type="Label" parent="Root"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "Output"
-
-[node name="OutputArea" type="Control" parent="Root"]
+[node name="OutputLog" type="RichTextLabel" parent="Root/InfoTabs/Output"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-clip_contents = true
+scroll_following = true
+selection_enabled = true
 
-[node name="OutputScroll" type="ScrollContainer" parent="Root/OutputArea"]
+[node name="OutputDialog" type="Window" parent="."]
 unique_name_in_owner = true
-layout_mode = 1
+title = "Output"
+size = Vector2i(900, 650)
+min_size = Vector2i(400, 300)
+visible = false
+transient = true
+exclusive = true
+
+[node name="ExpandedOutputLog" type="RichTextLabel" parent="OutputDialog"]
+unique_name_in_owner = true
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 2
-horizontal_scroll_mode = 0
-
-[node name="OutputLog" type="RichTextLabel" parent="Root/OutputArea/OutputScroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-scroll_active = false
-bbcode_enabled = true
-text = ""
+scroll_following = true
+selection_enabled = true
 
 [node name="ProjectDialog" type="FileDialog" parent="."]
 unique_name_in_owner = true

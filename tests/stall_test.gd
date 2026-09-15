@@ -18,7 +18,6 @@ func _ready() -> void:
 	add_child(runner)
 	runner.stall_timeout_ms = 400
 	runner._last_activity_ms = Time.get_ticks_msec()
-	runner._pid = OS.create_process("bash", ["-c", "sleep 30"])
 	runner.running = true
 	runner.process_finished.connect(func(_id: String, code: int) -> void: _got_code = code)
 	runner.process_finished.connect(AgentManager._on_process_finished)

@@ -29,14 +29,27 @@ var selected_agent_id: String = ""
 
 var _runners: Dictionary = {}
 var _output_history: Dictionary = {}
+var _last_reasoning_part: Dictionary = {}
 var _session_titles: Dictionary = {}
 var _session_titles_loaded_at: Dictionary = {}
-var _pending_thinking: Dictionary = {}
-var _pending_response: Dictionary = {}
-var _posted_reply: Dictionary = {}
+var _pending_permissions: Dictionary = {}
+var _pending_questions: Dictionary = {}
 var _last_error: Dictionary = {}
 var _git_refresh_queue: Dictionary = {}
 var _git_timers: Dictionary = {}
+var _file_status: Dictionary = {}
+
+const FILE_OP_READ := "R"
+const FILE_OP_DELETED := "D"
+const FILE_OP_CREATED := "C"
+const FILE_OP_MODIFIED := "M"
+
+var _file_op_colors: Dictionary = {
+	FILE_OP_READ: Color.WHITE,
+	FILE_OP_DELETED: Color(0.9, 0.3, 0.3),
+	FILE_OP_CREATED: Color(0.4, 0.55, 0.95),
+	FILE_OP_MODIFIED: Color(1.0, 0.8, 0.2),
+}
 
 
 func _ready() -> void:
@@ -100,6 +113,9 @@ func send_task(agent_id: String, task: String) -> int:
 	if runner != null and runner.running:
 		emit_chat_error(agent_id, "Agent busy. Wait for the current task to finish.")
 		return TASK_BUSY
+
+	_file_status.erase(agent_id)
+	EventBus.agent_files_status.emit(agent_id, {})
 
 	var session := get_session(agent_id)
 	session["task"] = task
@@ -167,10 +183,45 @@ func _detach_runner(agent_id: String) -> void:
 	ProfileStore.delete_session(agent_id)
 	sessions.erase(agent_id)
 	_output_history.erase(agent_id)
-	_pending_thinking.erase(agent_id)
-	_pending_response.erase(agent_id)
-	_posted_reply.erase(agent_id)
 	_last_error.erase(agent_id)
+	_file_status.erase(agent_id)
+	_clear_pending_requests(agent_id)
+
+
+func _clear_pending_requests(agent_id: String) -> void:
+	for requests in [_pending_permissions, _pending_questions]:
+		var request: Variant = requests.get(agent_id, null)
+		if request is Dictionary and not (request as Dictionary).is_empty():
+			EventBus.agent_request_resolved.emit(agent_id, str((request as Dictionary).get("id", "")))
+	_pending_permissions.erase(agent_id)
+	_pending_questions.erase(agent_id)
+
+
+func reply_permission(agent_id: String, request_id: String, reply: String, message: String = "") -> void:
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner != null:
+		runner.reply_permission(request_id, reply, message)
+	_pending_permissions.erase(agent_id)
+	emit_output(agent_id, "[permission] %s" % reply)
+	EventBus.agent_request_resolved.emit(agent_id, request_id)
+
+
+func reply_question(agent_id: String, request_id: String, answers: Array) -> void:
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner != null:
+		runner.reply_question(request_id, answers)
+	_pending_questions.erase(agent_id)
+	emit_output(agent_id, "[question] answered")
+	EventBus.agent_request_resolved.emit(agent_id, request_id)
+
+
+func reject_question(agent_id: String, request_id: String) -> void:
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner != null:
+		runner.reject_question(request_id)
+	_pending_questions.erase(agent_id)
+	emit_output(agent_id, "[question] rejected")
+	EventBus.agent_request_resolved.emit(agent_id, request_id)
 
 
 func _archive_session(agent_id: String) -> void:
@@ -252,6 +303,7 @@ func set_state(agent_id: String, state: String) -> void:
 
 
 func emit_output(agent_id: String, line: String) -> void:
+	_last_reasoning_part.erase(agent_id)
 	var history: Array = _output_history.get(agent_id, [])
 	history.append(line)
 	if history.size() > 500:
@@ -263,6 +315,12 @@ func emit_output(agent_id: String, line: String) -> void:
 
 func get_output_history(agent_id: String) -> Array:
 	return _output_history.get(agent_id, [])
+
+
+func get_file_status(agent_id: String) -> Dictionary:
+	if not _file_status.has(agent_id):
+		return {}
+	return _file_status[agent_id].duplicate()
 
 
 const SESSION_TITLES_TTL := 20.0
@@ -340,9 +398,6 @@ func emit_chat_error(agent_id: String, message: String) -> void:
 func _spawn_runner(agent_id: String, task: String) -> bool:
 	var profile := get_profile(agent_id)
 	var session := get_session(agent_id)
-	_posted_reply[agent_id] = false
-	_pending_response[agent_id] = {}
-	_pending_thinking.erase(agent_id)
 	var runner := OpenCodeRunner.new()
 	runner.name = "Runner_%s" % agent_id
 	add_child(runner)
@@ -371,7 +426,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 
 	runner.event_received.connect(_handle_event)
 	runner.process_finished.connect(_on_process_finished)
-	emit_output(agent_id, "[start] opencode run (session: %s)" % str(session.get("opencode_session", "new")))
+	emit_output(agent_id, "[start] opencode (session: %s)" % str(session.get("opencode_session", "new")))
 	queue_git_refresh(agent_id, 1.5)
 	return true
 
@@ -382,6 +437,7 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 	if runner != null and not runner.running:
 		_runners.erase(agent_id)
 		runner.queue_free()
+	_clear_pending_requests(agent_id)
 	if exit_code == -2:
 		var stall_reason := str(_last_error.get(agent_id, ""))
 		_last_error.erase(agent_id)
@@ -397,8 +453,6 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 		emit_chat_error(agent_id, message)
 		set_state(agent_id, "error")
 	else:
-		if not _posted_reply.get(agent_id, false):
-			_post_reply(agent_id)
 		emit_output(agent_id, "[end] done")
 	if str(get_session(agent_id).get("state", "")) in ACTIVE_STATES:
 		set_state(agent_id, "idle")
@@ -430,20 +484,19 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 		"reasoning":
 			var reason_text: String = str(part.get("text", ""))
 			if not reason_text.is_empty():
-				_pending_thinking[agent_id] = _pending_thinking.get(agent_id, "") + reason_text
-				emit_output(agent_id, "[think] " + reason_text)
+				var pid := str(part.get("id", ""))
+				var history := get_output_history(agent_id)
+				if not pid.is_empty() and _last_reasoning_part.get(agent_id, "") == pid and not history.is_empty():
+					history[history.size() - 1] += reason_text
+					EventBus.agent_output_updated.emit(agent_id)
+				else:
+					emit_output(agent_id, "[think] " + reason_text)
+					_last_reasoning_part[agent_id] = pid
 		"text":
 			if str(part.get("type", "")) == "text":
 				var text: String = str(part.get("text", ""))
 				if not text.is_empty():
-					var parts: Dictionary = _pending_response.get(agent_id, {})
-					var mid: String = str(part.get("messageID", ""))
-					var prev: String = str(parts.get(mid, ""))
-					if not prev.is_empty() and not text.begins_with(prev):
-						parts[mid] = prev + text
-					else:
-						parts[mid] = text
-					_pending_response[agent_id] = parts
+					_post_reply(agent_id, text)
 		"tool_use":
 			if str(part.get("type", "")) == "tool":
 				_handle_tool(agent_id, part)
@@ -453,13 +506,57 @@ func _handle_event(agent_id: String, event: Dictionary) -> void:
 				_finish_task(agent_id)
 			else:
 				set_state(agent_id, "working")
+		"permission_asked":
+			var permission: Dictionary = event.get("request", {})
+			_pending_permissions[agent_id] = permission
+			set_state(agent_id, "approval")
+			emit_output(agent_id, "[permission] %s" % _describe_permission(permission))
+			EventBus.agent_permission_asked.emit(agent_id, permission)
+		"permission_replied":
+			_pending_permissions.erase(agent_id)
+			set_state(agent_id, "working")
+			EventBus.agent_request_resolved.emit(agent_id, str(event.get("request_id", "")))
+		"question_asked":
+			var question: Dictionary = event.get("request", {})
+			_pending_questions[agent_id] = question
+			set_state(agent_id, "question")
+			emit_output(agent_id, "[question] %s" % _describe_question(question))
+			EventBus.agent_question_asked.emit(agent_id, question)
+		"question_resolved":
+			_pending_questions.erase(agent_id)
+			set_state(agent_id, "working")
+			EventBus.agent_request_resolved.emit(agent_id, str(event.get("request_id", "")))
 		_:
 			if etype == "stderr":
 				_handle_stderr(agent_id, str(event.get("line", "")))
 			elif etype == "error":
 				_capture_error(agent_id, event)
-			elif etype.contains("permission"):
-				set_state(agent_id, "approval")
+			elif etype == "runner_error":
+				var message := str(event.get("message", ""))
+				_last_error[agent_id] = message
+				emit_output(agent_id, "[error] " + message)
+
+
+func _describe_permission(request: Dictionary) -> String:
+	var kind := str(request.get("permission", "action"))
+	var patterns: Array = request.get("patterns", [])
+	var detail := " ".join(patterns) if not patterns.is_empty() else ""
+	if detail.is_empty():
+		var metadata: Variant = request.get("metadata", {})
+		if metadata is Dictionary:
+			var meta: Dictionary = metadata
+			detail = str(meta.get("command", meta.get("filePath", meta.get("path", ""))))
+	if detail.is_empty():
+		return kind
+	return "%s: %s" % [kind, detail]
+
+
+func _describe_question(request: Dictionary) -> String:
+	var questions: Array = request.get("questions", [])
+	if questions.is_empty() or not (questions[0] is Dictionary):
+		return "question"
+	var first: Dictionary = questions[0]
+	return str(first.get("header", first.get("question", "question")))
 
 
 func _handle_stderr(agent_id: String, line: String) -> void:
@@ -561,6 +658,7 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 		"completed":
 			emit_output(agent_id, "[tool] %s (done)" % note)
 			set_state(agent_id, base_state)
+			_track_file_operation(agent_id, tool_name, tool_input, status)
 			_flash_state(agent_id, "success", 1.2)
 		"error":
 			emit_output(agent_id, "! %s (error)" % note)
@@ -572,8 +670,67 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 		queue_git_refresh(agent_id, 1.0)
 
 
+func _track_file_operation(agent_id: String, tool_name: String, tool_input: Dictionary, status: String) -> void:
+	var op: String = ""
+	var files: Array = []
+	match tool_name:
+		"read":
+			op = FILE_OP_READ
+			var path := str(tool_input.get("filePath", ""))
+			if not path.is_empty():
+				files.append(path)
+		"edit":
+			op = FILE_OP_MODIFIED
+			var path := str(tool_input.get("filePath", ""))
+			if not path.is_empty():
+				files.append(path)
+		"multi_edit", "patch":
+			op = FILE_OP_MODIFIED
+			for edit in tool_input.get("edits", []):
+				if edit is Dictionary:
+					files.append(str((edit as Dictionary).get("filePath", "")))
+		"write":
+			var path := str(tool_input.get("filePath", ""))
+			if path.is_empty():
+				return
+			op = FILE_OP_MODIFIED if FileAccess.file_exists(path) else FILE_OP_CREATED
+			files.append(path)
+		"bash":
+			_track_bash_deletes(agent_id, str(tool_input.get("command", "")))
+			return
+		_:
+			return
+
+	for path in files:
+		if path.is_empty():
+			continue
+		_record_file_status(agent_id, path, op)
+
+
+func _track_bash_deletes(agent_id: String, command: String) -> void:
+	if command.is_empty():
+		return
+	var regex := RegEx.new()
+	regex.compile("\\b(?:rm|rmdir|unlink|del)\\s+(?:-[^\\s]+\\s+)*([^\\s;&|]+)")
+	var m := regex.search_all(command)
+	for match in m:
+		var path := match.get_string(1).strip_edges()
+		if path.is_empty() or path.begins_with("-") or path.begins_with("\\"):
+			continue
+		if (path.begins_with("\"") or path.begins_with("'")) and path.length() > 2:
+			path = path.substr(1, path.length() - 2)
+		_record_file_status(agent_id, path, FILE_OP_DELETED)
+
+
+func _record_file_status(agent_id: String, path: String, op: String) -> void:
+	if not _file_status.has(agent_id):
+		_file_status[agent_id] = {}
+	var files: Dictionary = _file_status[agent_id]
+	files[path] = op
+	EventBus.agent_files_status.emit(agent_id, files.duplicate())
+
+
 func _finish_task(agent_id: String) -> void:
-	_post_reply(agent_id)
 	var session := get_session(agent_id)
 	session["task"] = ""
 	session["state"] = "success"
@@ -584,21 +741,29 @@ func _finish_task(agent_id: String) -> void:
 		set_state(agent_id, "idle")
 
 
-func _post_reply(agent_id: String) -> void:
-	if _posted_reply.get(agent_id, false):
-		return
-	var chunks: Array[String] = []
-	var parts: Dictionary = _pending_response.get(agent_id, {})
-	for mid in parts:
-		var chunk := str(parts[mid]).strip_edges()
-		if not chunk.is_empty():
-			chunks.append(chunk)
-	_pending_response[agent_id] = {}
-	_pending_thinking.erase(agent_id)
-	var reply := "\n\n".join(chunks).strip_edges()
+const CHAT_MARKER := "CHAT:"
+
+
+func _split_chat_reply(text: String) -> Dictionary:
+	var idx := text.to_lower().find(CHAT_MARKER.to_lower())
+	if idx < 0:
+		return {"thinking": "", "chat": text.strip_edges()}
+	return {
+		"thinking": text.substr(0, idx).strip_edges(),
+		"chat": text.substr(idx + CHAT_MARKER.length()).strip_edges(),
+	}
+
+
+func _post_reply(agent_id: String, text: String) -> void:
+	var split := _split_chat_reply(text)
+	var thinking := str(split["thinking"])
+	for line in thinking.split("\n"):
+		var clean := line.strip_edges()
+		if not clean.is_empty():
+			emit_output(agent_id, "[think] " + clean)
+	var reply := str(split["chat"])
 	if reply.is_empty():
 		return
-	_posted_reply[agent_id] = true
 	var profile := get_profile(agent_id)
 	if profile == null:
 		return

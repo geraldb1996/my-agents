@@ -6,10 +6,11 @@ extends PanelContainer
 @onready var start_stop_button: Button = %StartStopButton
 @onready var state_label: Label = %StateLabel
 @onready var character_view: CharacterView = %CharacterView
-@onready var files_label: Label = %FilesLabel
+@onready var files_label: RichTextLabel = %FilesLabel
 @onready var git_label: Label = %GitLabel
 @onready var output_log: RichTextLabel = %OutputLog
-@onready var output_scroll: ScrollContainer = %OutputScroll
+@onready var output_dialog: Window = %OutputDialog
+@onready var expanded_output_log: RichTextLabel = %ExpandedOutputLog
 @onready var temp_skill_select: OptionButton = %TempSkillSelect
 @onready var temp_skills_box: VBoxContainer = %TempSkillsBox
 @onready var temp_skill_dialog: TempSkillDialog = %TempSkillDialog
@@ -19,9 +20,13 @@ extends PanelContainer
 
 var _current_id: String = ""
 var _skills_project: String = ""
+var _last_git_files: Array = []
 
 
 func _ready() -> void:
+	%ExpandOutputButton.pressed.connect(_on_expand_output)
+	output_dialog.close_requested.connect(output_dialog.hide)
+	EventBus.agent_output_updated.connect(_on_output_updated)
 	%SendButton.pressed.connect(_on_send_pressed)
 	%SelectProjectButton.pressed.connect(_on_select_project_pressed)
 	%StartStopButton.pressed.connect(_on_start_stop_pressed)
@@ -33,6 +38,7 @@ func _ready() -> void:
 	EventBus.agent_state_changed.connect(_on_state_changed)
 	EventBus.agent_output.connect(_on_output)
 	EventBus.agent_files_changed.connect(_on_files_changed)
+	EventBus.agent_files_status.connect(_on_files_status)
 	EventBus.agent_git_status.connect(_on_git_status)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
 	EventBus.temp_skills_changed.connect(_on_temp_skills_changed)
@@ -46,13 +52,16 @@ func _ready() -> void:
 
 func clear() -> void:
 	_current_id = ""
+	_last_git_files = []
 	agent_name_label.text = "No agent selected"
 	project_path_edit.text = ""
 	state_label.text = "--"
 	git_label.text = "--"
 	files_label.text = "--"
 	task_edit.text = ""
-	output_log.clear()
+	output_log.text = ""
+	expanded_output_log.text = ""
+	output_dialog.hide()
 	start_stop_button.text = "Start"
 	start_stop_button.disabled = true
 	%SendButton.disabled = true
@@ -73,7 +82,12 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	%SendButton.disabled = profile.project.is_empty()
 	var session := AgentManager.get_session(profile.id)
 	state_label.text = str(session.get("state", "offline")).capitalize()
-	output_log.clear()
+	output_log.text = ""
+	expanded_output_log.text = ""
+	output_dialog.title = "Output — " + profile.name
+	var file_status := AgentManager.get_file_status(profile.id)
+	if not file_status.is_empty():
+		_render_files_status(file_status)
 	for line in AgentManager.get_output_history(profile.id):
 		_append_output(str(line))
 	var project := profile.project
@@ -101,25 +115,69 @@ func _on_output(agent_id: String, line: String) -> void:
 	if agent_id != _current_id:
 		return
 	_append_output(line)
+	if AgentManager.get_output_history(_current_id).size() == 400:
+		_on_output_updated(_current_id)
 
 
 func _append_output(line: String) -> void:
-	output_log.append_text(line + "\n")
-	if output_log.get_line_count() > 500:
-		var lines := output_log.text.split("\n")
-		output_log.clear()
-		for i in range(maxi(0, lines.size() - 400), lines.size()):
-			output_log.append_text(lines[i] + "\n")
-	output_scroll.scroll_vertical = int(output_scroll.get_v_scroll_bar().max_value)
+	for log_view in [output_log, expanded_output_log]:
+		log_view.add_text(line + "\n")
+
+
+func _on_output_updated(agent_id: String) -> void:
+	if agent_id != _current_id:
+		return
+	var text := "\n".join(AgentManager.get_output_history(agent_id)) + "\n"
+	for log_view in [output_log, expanded_output_log]:
+		var bar: VScrollBar = log_view.get_v_scroll_bar()
+		var position := bar.value
+		var following := position >= bar.max_value - bar.page - 1.0
+		log_view.text = text
+		_restore_output_scroll.call_deferred(log_view, position, following)
+
+
+func _restore_output_scroll(log_view: RichTextLabel, position: float, following: bool) -> void:
+	var bar := log_view.get_v_scroll_bar()
+	bar.value = bar.max_value if following else position
+
+
+func _on_expand_output() -> void:
+	output_dialog.popup_centered_ratio(0.85)
 
 
 func _on_files_changed(agent_id: String, files: Array) -> void:
 	if agent_id != _current_id:
 		return
+	_last_git_files = files
+	if not AgentManager.get_file_status(agent_id).is_empty():
+		return
 	if files.is_empty():
 		files_label.text = "No modified files"
 	else:
 		files_label.text = "\n".join(files)
+
+
+func _on_files_status(agent_id: String, files: Dictionary) -> void:
+	if agent_id != _current_id:
+		return
+	_render_files_status(files)
+
+
+func _render_files_status(files: Dictionary) -> void:
+	if files.is_empty():
+		files_label.text = "No files touched"
+		return
+	var lines: Array[String] = []
+	for path in files:
+		var op := str(files[path])
+		var color: Color = AgentManager._file_op_colors.get(op, Color.WHITE)
+		lines.append("[color=#%s]%s[/color] %s" % [color.to_html(false), op, path])
+	files_label.text = "\n".join(lines)
+	files_label.tooltip_text = _status_legend()
+
+
+func _status_legend() -> String:
+	return "R (white): read - D (red): deleted - C (blue): created - M (yellow): modified"
 
 
 func _on_git_status(agent_id: String, branch: String, status: String) -> void:

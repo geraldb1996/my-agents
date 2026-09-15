@@ -12,6 +12,7 @@ var _pending_catalogs: int = 0
 func _ready() -> void:
 	agents_panel.new_agent_requested.connect(_on_new_agent)
 	agents_panel.edit_agent_requested.connect(_on_edit_agent)
+	agents_panel.duplicate_agent_requested.connect(_on_duplicate_agent)
 	agents_panel.delete_agent_requested.connect(_on_delete_agent)
 	ModelCatalog.models_loaded.connect(_on_catalog_loaded)
 	SkillCatalog.skills_loaded.connect(_on_catalog_loaded)
@@ -48,6 +49,12 @@ func _on_edit_agent(agent_id: String) -> void:
 	var profile := ProfileStore.get_profile(agent_id)
 	if profile != null:
 		editor.open_profile(profile)
+
+
+func _on_duplicate_agent(agent_id: String) -> void:
+	var profile := ProfileStore.get_profile(agent_id)
+	if profile != null:
+		editor.open_duplicate(profile)
 
 
 func _on_delete_agent(agent_id: String) -> void:
