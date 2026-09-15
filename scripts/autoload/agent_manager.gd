@@ -30,7 +30,7 @@ var selected_agent_id: String = ""
 var _runners: Dictionary = {}
 var _output_history: Dictionary = {}
 var _session_titles: Dictionary = {}
-var _session_titles_loaded_at: float = -1.0
+var _session_titles_loaded_at: Dictionary = {}
 var _pending_thinking: Dictionary = {}
 var _pending_response: Dictionary = {}
 var _posted_reply: Dictionary = {}
@@ -184,7 +184,7 @@ func _archive_session(agent_id: String) -> void:
 	history.append({
 		"opencode_session": sid,
 		"archived_at": Time.get_unix_time_from_system(),
-		"title": get_session_title(sid),
+		"title": get_session_title(sid, _project_of(agent_id)),
 	})
 	ProfileStore.save_session_history(agent_id, history)
 
@@ -268,29 +268,49 @@ func get_output_history(agent_id: String) -> Array:
 const SESSION_TITLES_TTL := 20.0
 
 
-func get_session_title(session_id: String) -> String:
-	_ensure_session_titles()
-	return str(_session_titles.get(session_id, ""))
+func get_session_title(session_id: String, project: String = "") -> String:
+	if session_id.is_empty():
+		return ""
+	_ensure_session_titles(project)
+	var title := str((_session_titles.get(project, {}) as Dictionary).get(session_id, ""))
+	if title.is_empty() and not project.is_empty():
+		_ensure_session_titles("")
+		title = str((_session_titles.get("", {}) as Dictionary).get(session_id, ""))
+	return title
 
 
-func _ensure_session_titles() -> void:
+func _project_of(agent_id: String) -> String:
+	var profile := get_profile(agent_id)
+	return profile.project if profile != null else ""
+
+
+func _ensure_session_titles(project: String) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
-	if _session_titles_loaded_at >= 0.0 and now - _session_titles_loaded_at < SESSION_TITLES_TTL:
+	var loaded_at := float(_session_titles_loaded_at.get(project, -1.0))
+	if loaded_at >= 0.0 and now - loaded_at < SESSION_TITLES_TTL:
 		return
-	_session_titles_loaded_at = now
-	_session_titles.clear()
+	_session_titles_loaded_at[project] = now
+	_session_titles.erase(project)
 	var output: Array = []
 	var cmd := "opencode session list --format json -n 300 </dev/null"
+	if not project.is_empty():
+		cmd = "cd %s && %s" % [_shell_quote(project), cmd]
 	if OS.execute("bash", ["-c", cmd], output, false, false) != OK:
 		return
 	var parsed = JSON.parse_string(_extract_json("\n".join(output)))
-	if parsed is not Array:
+	if not parsed is Array:
 		return
+	var titles: Dictionary = {}
 	for entry in parsed:
 		if entry is Dictionary:
 			var id := str(entry.get("id", ""))
 			if not id.is_empty():
-				_session_titles[id] = str(entry.get("title", ""))
+				titles[id] = str(entry.get("title", ""))
+	_session_titles[project] = titles
+
+
+func _shell_quote(s: String) -> String:
+	return "'" + s.replace("'", "'\\''") + "'"
 
 
 func _extract_json(text: String) -> String:
@@ -338,6 +358,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 		"opencode_agent": profile.opencode_agent,
 		"session_id": str(session.get("opencode_session", "")),
 		"task": task,
+		"personality": profile.personality,
 		"skills_context": ", ".join(profile.get_all_skills()),
 		"temp_context": profile.get_temp_context(),
 	})

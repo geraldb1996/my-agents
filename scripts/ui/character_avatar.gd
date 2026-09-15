@@ -126,12 +126,8 @@ func _process(delta: float) -> void:
 	avatar.scale = Vector2(scale, scale)
 
 
-func _apply_state(state: String) -> void:
-	var color: Color = STATE_COLORS.get(state, STATE_COLORS["idle"])
-	if state == "offline":
-		avatar.modulate = Color(0.55, 0.55, 0.6, 0.85)
-	else:
-		avatar.modulate = color.lerp(Color(1, 1, 1), 0.65)
+func _apply_state(_state: String) -> void:
+	avatar.modulate = Color(1, 1, 1)
 
 
 func _prepare_custom_frames() -> void:

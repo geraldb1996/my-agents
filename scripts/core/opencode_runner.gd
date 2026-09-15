@@ -12,6 +12,7 @@ var variant: String = ""
 var opencode_agent: String = ""
 var session_id: String = ""
 var task: String = ""
+var personality: String = ""
 var skills_context: String = ""
 var temp_context: String = ""
 var running: bool = false
@@ -38,6 +39,7 @@ func start(opts: Dictionary) -> bool:
 	opencode_agent = str(opts.get("opencode_agent", ""))
 	session_id = str(opts.get("session_id", ""))
 	task = str(opts.get("task", ""))
+	personality = str(opts.get("personality", ""))
 	skills_context = str(opts.get("skills_context", ""))
 	temp_context = str(opts.get("temp_context", ""))
 
@@ -148,6 +150,9 @@ func _build_prompt() -> String:
 		var display_name := agent_name if not agent_name.is_empty() else agent_id
 		var intro := "You are %s, an AI agent in a team working through OpenCode CLI." % display_name
 		parts.append(intro)
+		var trimmed_personality := personality.strip_edges()
+		if not trimmed_personality.is_empty():
+			parts.append(trimmed_personality)
 		if not skills_context.is_empty():
 			parts.append("Your skills: %s" % skills_context)
 		parts.append("RESPONSE FORMAT (mandatory): always start your final reply with 'CHAT:' followed by your message, for example: CHAT: your reply here. Never respond without this prefix.")

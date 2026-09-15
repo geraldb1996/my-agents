@@ -32,6 +32,7 @@ func _ready() -> void:
 	EventBus.profile_saved.connect(_on_profile_saved)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
 	EventBus.agent_state_changed.connect(_on_state_changed)
+	EventBus.agent_output.connect(_on_agent_output)
 	EventBus.agent_selected.connect(_on_agent_selected)
 	EventBus.agent_context_usage.connect(_on_context_usage)
 	%NewButton.pressed.connect(_on_new_pressed)
@@ -82,6 +83,14 @@ func _build_card(profile: AgentProfile) -> Control:
 	name_label.text = profile.name
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(name_label)
+	var session_label := Label.new()
+	session_label.name = "SessionLabel"
+	session_label.modulate = Color(0.62, 0.7, 0.85)
+	session_label.add_theme_font_size_override("font_size", 9)
+	session_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	session_label.text = _session_text(profile)
+	session_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_child(session_label)
 	var meta_label := Label.new()
 	meta_label.modulate = Color(0.7, 0.7, 0.75)
 	meta_label.add_theme_font_size_override("font_size", 8)
@@ -130,8 +139,32 @@ func _build_card(profile: AgentProfile) -> Control:
 	card.set_meta("context_pct", context_pct)
 	card.set_meta("avatar", avatar)
 	card.set_meta("variant_label", variant_label)
+	card.set_meta("session_label", session_label)
 	_update_card_state(profile.id, _get_state(profile.id))
 	return card
+
+
+func _session_text(profile: AgentProfile) -> String:
+	var sid := str(AgentManager.get_session(profile.id).get("opencode_session", ""))
+	if sid.is_empty():
+		return "New session"
+	var title := AgentManager.get_session_title(sid, profile.project)
+	if title.is_empty():
+		return "Session %s" % sid.right(6)
+	return title
+
+
+func _update_card_session(agent_id: String) -> void:
+	var card: Control = _cards.get(agent_id)
+	if card == null:
+		return
+	var label: Label = card.get_meta("session_label")
+	if label == null:
+		return
+	var profile := ProfileStore.get_profile(agent_id)
+	if profile == null:
+		return
+	label.text = _session_text(profile)
 
 
 func _on_card_input(event: InputEvent, agent_id: String) -> void:
@@ -200,6 +233,8 @@ func _populate_session_menu(agent_id: String) -> void:
 	_menu_sessions.clear()
 	%SessionMenu.clear()
 	var history := ProfileStore.load_session_history(agent_id)
+	var profile := ProfileStore.get_profile(agent_id)
+	var project := profile.project if profile != null else ""
 	if history.is_empty():
 		%SessionMenu.add_item("No previous sessions", 0)
 		return
@@ -215,9 +250,9 @@ func _populate_session_menu(agent_id: String) -> void:
 		var archived := int(entry.get("archived_at", 0))
 		var title := str(entry.get("title", ""))
 		if title.is_empty():
-			title = AgentManager.get_session_title(sid)
+			title = AgentManager.get_session_title(sid, project)
 		if title.is_empty():
-			title = sid.right(10)
+			title = "Session %s" % sid.right(6)
 		var label := "%s · %s" % [title, Time.get_datetime_string_from_unix_time(archived)]
 		%SessionMenu.add_item(label, id)
 		%SessionMenu.set_item_tooltip(id, sid)
@@ -296,6 +331,11 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 
 func _on_state_changed(agent_id: String, _state: String) -> void:
 	_update_card_state(agent_id, _get_state(agent_id))
+	_update_card_session(agent_id)
+
+
+func _on_agent_output(agent_id: String, _line: String) -> void:
+	_update_card_session(agent_id)
 
 
 func _update_card_state(agent_id: String, state: String) -> void:
