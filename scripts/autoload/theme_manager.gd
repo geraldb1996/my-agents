@@ -4,6 +4,7 @@ signal theme_changed
 
 const THEME_NAMES: Array[String] = ["light", "soft", "dark"]
 const DEFAULT_THEME := "dark"
+const EMOJI_FONT := preload("res://assets/fonts/NotoColorEmoji.ttf")
 
 const PALETTES: Dictionary = {
 	"dark": {
@@ -120,6 +121,7 @@ func apply_theme(name: String) -> void:
 
 func build_theme(p: Dictionary) -> Theme:
 	var theme := Theme.new()
+	theme.default_font = _base_font()
 	theme.set_type_variation("DialogPanel", "PanelContainer")
 	theme.set_type_variation("SunkenPanel", "PanelContainer")
 	theme.set_type_variation("MutedLabel", "Label")
@@ -217,6 +219,13 @@ func _build_lists(theme: Theme, p: Dictionary) -> void:
 		theme.set_color("font_color", type_name, p["text"])
 		theme.set_color("font_selected_color", type_name, p["text"])
 		theme.set_color("guide_color", type_name, p["border"])
+
+
+func _base_font() -> FontVariation:
+	var font := FontVariation.new()
+	font.base_font = ThemeDB.fallback_font
+	font.fallbacks = [EMOJI_FONT]
+	return font
 
 
 func _flat(bg: Color, radius: int, border_color: Color, border_width: int, pad_h: float, pad_v: float) -> StyleBoxFlat:
