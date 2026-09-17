@@ -1,5 +1,13 @@
 extends Node
 
+class RecordingManager extends "res://scripts/autoload/agent_manager.gd":
+	var sent_tasks: Array[String] = []
+
+	func _spawn_runner(_agent_id: String, task: String) -> bool:
+		sent_tasks.append(task)
+		return true
+
+
 var _messages: Array[String] = []
 
 const CASES := [
@@ -21,6 +29,7 @@ func _ready() -> void:
 		ok = ok and passed
 		print("[CHATTEST] pass=", passed, " chat=", got_chat, " think=", got_think)
 	ok = _test_live_messages() and ok
+	ok = await _test_task_senders() and ok
 	print("[CHATTEST] RESULT=", "PASS" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)
 
@@ -85,3 +94,42 @@ func _test_live_messages() -> bool:
 
 func _send_part(runner: OpenCodeRunner, part: Dictionary) -> void:
 	runner._handle_sse_event({"type": "message.part.updated", "properties": {"part": part}})
+
+
+func _test_task_senders() -> bool:
+	var manager := RecordingManager.new()
+	manager.name = "AgentManagerStub"
+	get_tree().root.add_child.call_deferred(manager)
+	await get_tree().process_frame
+	var agent := AgentProfile.new()
+	agent.id = "sender_fmt_test_%d" % Time.get_ticks_usec()
+	agent.name = "SenderFmt"
+	agent.project = "/tmp/opencode/sender-fmt-test"
+	manager.sessions[agent.id] = {"state": "offline"}
+	ProfileStore.profiles[agent.id] = agent
+	var ok := true
+	var rc := manager.send_task(agent.id, "Do something", "Alice")
+	ok = ok and rc == AgentManager.TASK_OK and manager.sent_tasks == ["[Alice] Do something"]
+	var rc_chat := manager.send_chat_message(agent.id, "hello from chat")
+	ok = ok and rc_chat == AgentManager.TASK_OK and manager.sent_tasks.size() == 2 and manager.sent_tasks[1] == "[User] hello from chat"
+	var busy_runner := OpenCodeRunner.new()
+	busy_runner.running = true
+	manager._runners[agent.id] = busy_runner
+	manager.send_chat_message(agent.id, "queued while busy")
+	ok = ok and manager.sent_tasks.size() == 2 and manager._chat_inbox[agent.id].size() == 1
+	ok = ok and str(manager._chat_inbox[agent.id][0].get("sender_name", "")) == "User"
+	manager._enqueue_chat(agent.id, "relay queued", 2, "Bob")
+	busy_runner.running = false
+	manager._runners.erase(agent.id)
+	manager._deliver_inbox(agent.id)
+	manager._deliver_inbox(agent.id)
+	ok = ok and manager.sent_tasks.size() == 4 and manager.sent_tasks[2] == "[User] queued while busy" and manager.sent_tasks[3] == "[Bob] relay queued"
+	ok = ok and manager._chat_depth.get(agent.id, -1) == 2
+	manager._deliver_relay(agent.id, agent.id, "direct relay", 1)
+	ok = ok and manager.sent_tasks.size() == 5 and manager.sent_tasks[4] == "[SenderFmt] direct relay"
+	manager.sessions.erase(agent.id)
+	var captured_tasks := manager.sent_tasks.duplicate()
+	manager.queue_free()
+	ProfileStore.profiles.erase(agent.id)
+	print("[CHATTEST] task sender prefixes=", ok, " tasks=", captured_tasks if not ok else [])
+	return ok
