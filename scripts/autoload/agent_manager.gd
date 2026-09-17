@@ -38,6 +38,7 @@ var _pending_questions: Dictionary = {}
 var _last_error: Dictionary = {}
 var _git_refresh_queue: Dictionary = {}
 var _git_timers: Dictionary = {}
+var _git_threads: Dictionary = {}
 var _file_status: Dictionary = {}
 
 const FILE_OP_READ := "R"
@@ -860,8 +861,25 @@ func _refresh_git(agent_id: String) -> void:
 	var profile := get_profile(agent_id)
 	if profile == null or profile.project.is_empty():
 		return
+	if _git_threads.has(agent_id):
+		return
+	var thread := Thread.new()
+	_git_threads[agent_id] = thread
+	thread.start(_git_worker.bind(agent_id, profile.project))
+
+
+func _git_worker(agent_id: String, project: String) -> void:
 	var output: Array = []
-	var err := OS.execute("git", ["-C", profile.project, "status", "--porcelain", "-b"], output, true, false)
+	var err := OS.execute("git", ["-C", project, "status", "--porcelain", "-b"], output, true, false)
+	call_deferred("_on_git_refreshed", agent_id, err, output.duplicate())
+
+
+func _on_git_refreshed(agent_id: String, err: int, output: Array) -> void:
+	if _git_threads.has(agent_id):
+		var thread: Thread = _git_threads[agent_id]
+		_git_threads.erase(agent_id)
+		if thread.is_started():
+			thread.wait_to_finish()
 	if err != OK:
 		emit_output(agent_id, "[git] not a git repository")
 		return

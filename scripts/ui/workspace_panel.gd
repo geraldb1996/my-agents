@@ -145,7 +145,7 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 	var project := profile.project
 	if _skills_project != project:
 		_skills_project = project
-		SkillCatalog.refresh(project)
+		SkillCatalog.refresh_async(project)
 	else:
 		_populate_temp_skill_select()
 	_refresh_temp_skills()
@@ -320,7 +320,7 @@ func _apply_project(path: String) -> void:
 	project_path_edit.tooltip_text = path
 	%SendButton.disabled = path.is_empty()
 	_skills_project = path
-	SkillCatalog.refresh(path)
+	SkillCatalog.refresh_async(path)
 	AgentManager.queue_git_refresh(_current_id, 0.3)
 	EventBus.agent_output.emit(_current_id, "[project] set to %s" % path)
 

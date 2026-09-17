@@ -111,10 +111,9 @@ func _populate_history() -> void:
 
 
 func _on_chat_message(sender: String, content: String, _mentions: Array, timestamp: int, is_agent: bool) -> void:
+	_play_msg_sound()
 	if not _passes_filter(sender, is_agent):
 		return
-	if is_agent:
-		_play_msg_sound()
 	_add_bubble(sender, content, timestamp, is_agent)
 	_autoscroll()
 
