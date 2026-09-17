@@ -81,6 +81,30 @@ func get_profile(agent_id: String) -> AgentProfile:
 	return profiles.get(agent_id, null)
 
 
+func find_profile_by_name(name: String) -> AgentProfile:
+	var lower := name.to_lower()
+	for profile in profiles.values():
+		if profile.name.to_lower() == lower or profile.name.to_lower().replace(" ", "_") == lower:
+			return profile
+	return null
+
+
+func extract_mentions(text: String) -> Array:
+	var mentions: Array = []
+	var regex := RegEx.new()
+	regex.compile("@([A-Za-z0-9_]+)")
+	for m in regex.search_all(text):
+		var name := m.get_string(1)
+		if name == "all":
+			if not mentions.has("all"):
+				mentions.append("all")
+			continue
+		var profile := find_profile_by_name(name)
+		if profile != null and not mentions.has(profile.id):
+			mentions.append(profile.id)
+	return mentions
+
+
 func load_chat_history() -> void:
 	var text := _read_text(CHAT_PATH)
 	if text.is_empty():

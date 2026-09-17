@@ -15,6 +15,7 @@ var task: String = ""
 var personality: String = ""
 var skills_context: String = ""
 var temp_context: String = ""
+var team_context: String = ""
 var running: bool = false
 var stall_timeout_ms: int = 120000
 
@@ -46,6 +47,7 @@ func start(opts: Dictionary) -> bool:
 	personality = str(opts.get("personality", ""))
 	skills_context = str(opts.get("skills_context", ""))
 	temp_context = str(opts.get("temp_context", ""))
+	team_context = str(opts.get("team_context", ""))
 
 	if agent_id.is_empty() or project.is_empty():
 		return false
@@ -344,6 +346,8 @@ func _build_prompt() -> String:
 		var language_instruction := SystemSettings.get_agents_language_instruction()
 		if not language_instruction.is_empty():
 			parts.append(language_instruction)
+	if not team_context.is_empty():
+		parts.append("Your teammates: %s. To hand work to a teammate, mention @TheirName in your reply (use underscores for spaces), for example: @Elliot commit and push the changes. It is delivered as a new task to that agent." % team_context)
 	if not temp_context.is_empty():
 		parts.append("Temporary skill instructions (session only):\n%s" % temp_context)
 	if not task.is_empty():

@@ -349,35 +349,12 @@ func _on_send_pressed() -> void:
 	var text := input_edit.text.strip_edges()
 	if text.is_empty():
 		return
-	var mentions := _extract_mentions(text)
+	var mentions := ProfileStore.extract_mentions(text)
 	var ts := Time.get_unix_time_from_system() * 1000
 	ProfileStore.append_chat_message("user", text, mentions, ts, false)
 	EventBus.chat_message.emit("user", text, mentions, ts, false)
 	input_edit.clear()
 	_route_message(text, mentions)
-
-
-func _extract_mentions(text: String) -> Array:
-	var mentions: Array = []
-	var regex := RegEx.new()
-	regex.compile("@([A-Za-z0-9_]+)")
-	for m in regex.search_all(text):
-		var name := m.get_string(1)
-		if name == "all" and not mentions.has("all"):
-			mentions.append("all")
-		else:
-			var profile := _find_profile_by_name(name)
-			if profile != null and not mentions.has(profile.id):
-				mentions.append(profile.id)
-	return mentions
-
-
-func _find_profile_by_name(name: String) -> AgentProfile:
-	var lower := name.to_lower()
-	for profile in ProfileStore.profiles.values():
-		if profile.name.to_lower() == lower or profile.name.to_lower().replace(" ", "_") == lower:
-			return profile
-	return null
 
 
 func _route_message(text: String, mentions: Array) -> void:

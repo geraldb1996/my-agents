@@ -41,6 +41,11 @@ var _git_timers: Dictionary = {}
 var _git_threads: Dictionary = {}
 var _file_status: Dictionary = {}
 
+const CHAT_MAX_DEPTH := 3
+var _chat_inbox: Dictionary = {}
+var _chat_depth: Dictionary = {}
+var _relay_seen: Dictionary = {}
+
 const FILE_OP_READ := "R"
 const FILE_OP_DELETED := "D"
 const FILE_OP_CREATED := "C"
@@ -111,6 +116,8 @@ func send_task(agent_id: String, task: String) -> int:
 
 	_file_status.erase(agent_id)
 	EventBus.agent_files_status.emit(agent_id, {})
+	_chat_depth[agent_id] = 0
+	_relay_seen[agent_id] = {}
 
 	var session := get_session(agent_id)
 	session["task"] = task
@@ -125,6 +132,17 @@ func send_task(agent_id: String, task: String) -> int:
 
 func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, "[Team chat] %s" % content)
+
+
+func _team_context_for(agent_id: String) -> String:
+	var names: Array[String] = []
+	for profile_id in ProfileStore.profiles:
+		if profile_id == agent_id:
+			continue
+		var profile := ProfileStore.get_profile(profile_id)
+		if profile != null:
+			names.append(profile.name)
+	return ", ".join(names)
 
 
 func delete_session(agent_id: String) -> void:
@@ -427,6 +445,7 @@ func _spawn_runner(agent_id: String, task: String) -> bool:
 		"personality": profile.personality,
 		"skills_context": ", ".join(profile.get_all_skills()),
 		"temp_context": profile.get_temp_context(),
+		"team_context": _team_context_for(agent_id),
 	})
 	if not started:
 		emit_chat_error(agent_id, "Failed to launch opencode CLI. Is it in PATH?")
@@ -473,6 +492,7 @@ func _on_process_finished(agent_id: String, exit_code: int) -> void:
 		EventBus.agent_task_updated.emit(agent_id, "")
 		ProfileStore.save_session(agent_id, session)
 	queue_git_refresh(agent_id, 0.5)
+	_deliver_inbox(agent_id)
 
 
 func _handle_event(agent_id: String, event: Dictionary) -> void:
@@ -836,8 +856,78 @@ func _post_reply(agent_id: String, text: String) -> void:
 	if profile == null:
 		return
 	var ts := Time.get_unix_time_from_system() * 1000
-	ProfileStore.append_chat_message(profile.name, reply, [], ts, true)
-	EventBus.chat_message.emit(profile.name, reply, [], ts, true)
+	var mentions := ProfileStore.extract_mentions(reply)
+	ProfileStore.append_chat_message(profile.name, reply, mentions, ts, true)
+	EventBus.chat_message.emit(profile.name, reply, mentions, ts, true)
+	_relay_mentions(agent_id, reply, mentions)
+
+
+func _relay_mentions(sender_id: String, reply: String, mentions: Array) -> void:
+	if mentions.is_empty():
+		return
+	var depth := int(_chat_depth.get(sender_id, 0)) + 1
+	if depth > CHAT_MAX_DEPTH:
+		return
+	if not _relay_seen.has(sender_id):
+		_relay_seen[sender_id] = {}
+	var seen: Dictionary = _relay_seen[sender_id]
+	for target_id in mentions:
+		if str(target_id) == "all" or str(target_id) == sender_id:
+			continue
+		if seen.has(str(target_id)):
+			continue
+		seen[str(target_id)] = true
+		_deliver_relay(str(target_id), sender_id, reply, depth)
+
+
+func _deliver_relay(target_id: String, sender_id: String, text: String, depth: int) -> void:
+	var profile := get_profile(target_id)
+	if profile == null:
+		return
+	var sender := get_profile(sender_id)
+	var sender_name := sender.name if sender != null else sender_id
+	if profile.project.is_empty():
+		_emit_system_chat("%s could not receive a message from %s: no project set." % [profile.name, sender_name])
+		return
+	if sender != null and not sender.project.is_empty() and sender.project != profile.project:
+		_emit_system_chat("Note: %s works in a different project (%s) than %s; the message will run there." % [profile.name, profile.project, sender_name])
+	var task := "[Team chat] Message from %s: %s" % [sender_name, text]
+	var result := send_task(target_id, task)
+	if result == TASK_OK:
+		_chat_depth[target_id] = depth
+	elif result == TASK_BUSY:
+		_enqueue_chat(target_id, task, depth)
+		_emit_system_chat("%s is busy; message from %s queued and will be delivered when it finishes." % [profile.name, sender_name])
+
+
+func _enqueue_chat(agent_id: String, task: String, depth: int) -> void:
+	if not _chat_inbox.has(agent_id):
+		_chat_inbox[agent_id] = []
+	(_chat_inbox[agent_id] as Array).append({"task": task, "depth": depth})
+
+
+func _deliver_inbox(agent_id: String) -> void:
+	if not _chat_inbox.has(agent_id):
+		return
+	var queued: Array = _chat_inbox[agent_id]
+	if queued.is_empty():
+		_chat_inbox.erase(agent_id)
+		return
+	var item: Dictionary = queued.pop_front()
+	if queued.is_empty():
+		_chat_inbox.erase(agent_id)
+	var result := send_task(agent_id, str(item.get("task", "")))
+	if result == TASK_OK:
+		_chat_depth[agent_id] = int(item.get("depth", 0))
+	elif result == TASK_BUSY:
+		queued.push_front(item)
+		_chat_inbox[agent_id] = queued
+
+
+func _emit_system_chat(message: String) -> void:
+	var ts := Time.get_unix_time_from_system() * 1000
+	ProfileStore.append_chat_message("system", message, [], ts, false)
+	EventBus.chat_message.emit("system", message, [], ts, false)
 
 
 func _flash_state(agent_id: String, state: String, duration: float) -> void:

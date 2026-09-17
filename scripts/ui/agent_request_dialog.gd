@@ -11,6 +11,7 @@ var _avatar: CharacterAvatar
 var _name_label: Label
 var _kind_label: Label
 var _title_label: Label
+var _scroll: ScrollContainer
 var _body: VBoxContainer
 var _buttons: HBoxContainer
 
@@ -23,6 +24,7 @@ func _ready() -> void:
 	EventBus.agent_question_asked.connect(_on_question_asked)
 	EventBus.agent_request_resolved.connect(_on_request_resolved)
 	ThemeManager.theme_changed.connect(_on_theme_changed)
+	get_viewport().size_changed.connect(_on_viewport_resized)
 	visible = false
 
 
@@ -73,6 +75,7 @@ func _build() -> void:
 	box.add_child(_title_label)
 
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 40)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -166,6 +169,29 @@ func _populate() -> void:
 		_avatar.set_state("question")
 		_kind_label.text = "asks a question"
 		_populate_question(request)
+	_resize_panel_to_content()
+
+
+func _resize_panel_to_content() -> void:
+	if _scroll == null or _panel == null:
+		return
+	_scroll.custom_minimum_size.y = 40.0
+	await get_tree().process_frame
+	var content_height := maxf(_body.size.y, _body.get_combined_minimum_size().y)
+	if content_height <= 0.0:
+		return
+	var max_height := get_viewport_rect().size.y * 0.9
+	var chrome := _panel.size.y - _scroll.size.y
+	_scroll.custom_minimum_size.y = clampf(content_height, 40.0, maxf(40.0, max_height - chrome))
+	await get_tree().process_frame
+	var overflow := _panel.size.y - max_height
+	if overflow > 0.0:
+		_scroll.custom_minimum_size.y = maxf(40.0, _scroll.custom_minimum_size.y - overflow)
+
+
+func _on_viewport_resized() -> void:
+	if visible and not _current.is_empty():
+		_resize_panel_to_content()
 
 
 func _populate_permission(request: Dictionary) -> void:
