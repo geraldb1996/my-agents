@@ -59,18 +59,24 @@ func _ready() -> void:
 	runner.session_id = "existing_session"
 	_check(not runner._build_prompt().contains("only in:"), "Language instruction is initial-session context")
 	runner.session_id = ""
+	_check(SystemSettings.save_settings(false, "es", "type", "Japanese", "soft", "Gerald") == OK, "Save user name")
+	_check(runner._build_prompt().contains("The user you assist is named Gerald; refer to them by name when addressing them."), "Initial prompt includes user name")
 
 	SystemSettings.ui_language = "en"
 	SystemSettings.agents_language = ""
 	SystemSettings.load_settings()
 	_check(SystemSettings.ui_language == "es" and SystemSettings.agents_language == "Japanese", "Settings persist across reload")
+	_check(SystemSettings.user_name == "Gerald", "User name persists across reload")
 	dialog.open()
 	_check(dialog.agents_language_select.selected == 1 and dialog.agents_language_edit.text == "Japanese", "Dialog restores saved values")
 	_check(dialog.ui_theme_select.selected == 1, "Dialog restores saved theme")
+	_check(dialog.user_name_edit.text == "Gerald", "Dialog restores saved user name")
 	dialog.sounds_select.select(0)
 	dialog.ui_language_select.select(0)
+	dialog.user_name_edit.text = "Wrong"
 	dialog.get_node("%CancelSettingsButton").pressed.emit()
 	_check(SystemSettings.ui_language == "es" and not SystemSettings.ui_sounds, "Cancel discards draft")
+	_check(SystemSettings.user_name == "Gerald", "Cancel keeps saved user name")
 	dialog.open()
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
@@ -79,11 +85,24 @@ func _ready() -> void:
 	_check(not dialog.visible, "Escape closes settings")
 	_check(SystemSettings.save_settings(true, "en", "none", "Japanese") == OK, "None can retain an inactive draft")
 	_check(not runner._build_prompt().contains("only in:"), "None adds no language instruction even with saved text")
+	_check(SystemSettings.save_settings(true, "en", "none", "Japanese", "dark", "Gerald") == OK, "Save user name via public API")
 	_check(SystemSettings.save_settings(false, "es", "type", " ") == ERR_INVALID_PARAMETER, "Invalid language cannot be saved")
 	_check(SystemSettings.ui_sounds and SystemSettings.ui_language == "en", "Invalid settings do not change active settings")
 	_check(SystemSettings.save_settings(true, "en", "none", "", "neon") == ERR_INVALID_PARAMETER, "Invalid theme cannot be saved")
 	_check(SystemSettings.ui_theme == "dark", "Invalid theme does not change active theme")
-	await get_tree().process_frame
+	_check(SystemSettings.save_settings(true, "en", "none", "", "dark", "  Gerald  ") == OK, "Save with user name")
+	_check(SystemSettings.user_name == "Gerald", "User name trimmed on save")
+	var named_runner := OpenCodeRunner.new()
+	named_runner.agent_name = "NameBot"
+	named_runner.task = "Greet the user."
+	var named_prompt := named_runner._build_prompt()
+	_check(named_prompt.contains("The user you assist is named Gerald; refer to them by name when addressing them."), "Initial prompt includes user name")
+	_check(named_prompt.find("CHAT:") < named_prompt.find("named Gerald"), "User name follows response format")
+	named_runner.session_id = "existing_session"
+	_check(not named_runner._build_prompt().contains("named Gerald"), "User name is initial-session context")
+	named_runner.session_id = ""
+	named_runner.free()
+	chat.queue_free()
 	_check(workspace.info_tabs.get_tab_title(0) == "Task", "Can switch UI back to English")
 	_check(workspace.task_label.text == "(No task assigned)", "Dynamic placeholder returns to English")
 	_check(not AudioServer.is_bus_mute(AudioServer.get_bus_index(SystemSettings.UI_AUDIO_BUS)), "UI audio re-enabled")

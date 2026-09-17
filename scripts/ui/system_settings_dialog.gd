@@ -6,6 +6,7 @@ extends Window
 @onready var ui_language_select: OptionButton = %UILanguageSelect
 @onready var agents_language_select: OptionButton = %AgentsLanguageSelect
 @onready var agents_language_edit: LineEdit = %AgentsLanguageEdit
+@onready var user_name_edit: LineEdit = %UserNameEdit
 @onready var error_label: Label = %SettingsError
 @onready var save_button: Button = %SaveSettingsButton
 
@@ -25,6 +26,7 @@ func open() -> void:
 	ui_language_select.select(0 if SystemSettings.ui_language == "en" else 1)
 	agents_language_select.select(0 if SystemSettings.agents_language_mode == "none" else 1)
 	agents_language_edit.text = SystemSettings.agents_language
+	user_name_edit.text = SystemSettings.user_name
 	error_label.text = ""
 	_update_language_input()
 	popup()
@@ -59,7 +61,8 @@ func _on_save_pressed() -> void:
 		"en" if ui_language_select.selected == 0 else "es",
 		"none" if agents_language_select.selected == 0 else "type",
 		agents_language_edit.text,
-		ThemeManager.THEME_NAMES[theme_index]
+		ThemeManager.THEME_NAMES[theme_index],
+		user_name_edit.text
 	)
 	if error != OK:
 		error_label.text = tr("Could not save settings: %s") % error_string(error)

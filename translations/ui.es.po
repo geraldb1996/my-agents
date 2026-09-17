@@ -32,6 +32,15 @@ msgstr "Idioma, por ejemplo español, inglés, japonés..."
 msgid "None adds no language instruction. Type adds your language to the initial prompt of new agent sessions."
 msgstr "Ninguno no añade instrucciones de idioma. Escribir añade el idioma al prompt inicial de las nuevas sesiones de agentes."
 
+msgid "Your Name:"
+msgstr "Tu nombre:"
+
+msgid "e.g. Alex"
+msgstr "p. ej. Alex"
+
+msgid "Agents use this name to address you. Empty adds no instruction."
+msgstr "Los agentes usan este nombre para dirigirse a ti. Vacío no añade instrucciones."
+
 msgid "Could not save settings: %s"
 msgstr "No se pudo guardar la configuración: %s"
 

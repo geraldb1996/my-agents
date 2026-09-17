@@ -10,6 +10,7 @@ var ui_language: String = "en"
 var ui_theme: String = "dark"
 var agents_language_mode: String = "none"
 var agents_language: String = ""
+var user_name: String = ""
 
 
 func _ready() -> void:
@@ -32,11 +33,13 @@ func load_settings() -> void:
 	agents_language = str(config.get_value("agents", "language", "")).strip_edges()
 	if agents_language_mode not in ["none", "type"] or agents_language.is_empty():
 		agents_language_mode = "none"
+	user_name = str(config.get_value("agents", "user_name", "")).strip_edges()
 	_apply_settings()
 
 
-func save_settings(sounds: bool, locale: String, language_mode: String, language: String, theme: String = "dark") -> Error:
+func save_settings(sounds: bool, locale: String, language_mode: String, language: String, theme: String = "dark", user: String = "") -> Error:
 	language = language.strip_edges()
+	user = user.strip_edges()
 	if locale not in ["en", "es"] or language_mode not in ["none", "type"]:
 		return ERR_INVALID_PARAMETER
 	if language_mode == "type" and language.is_empty():
@@ -49,6 +52,7 @@ func save_settings(sounds: bool, locale: String, language_mode: String, language
 	config.set_value("ui", "theme", theme)
 	config.set_value("agents", "language_mode", language_mode)
 	config.set_value("agents", "language", language)
+	config.set_value("agents", "user_name", user)
 	var error := config.save(SETTINGS_PATH)
 	if error != OK:
 		push_warning("Could not save system settings: %s" % error_string(error))
@@ -58,6 +62,7 @@ func save_settings(sounds: bool, locale: String, language_mode: String, language
 	ui_theme = theme
 	agents_language_mode = language_mode
 	agents_language = language
+	user_name = user
 	_apply_settings()
 	return OK
 
@@ -79,3 +84,9 @@ func get_agents_language_instruction() -> String:
 	if agents_language_mode != "type" or agents_language.strip_edges().is_empty():
 		return ""
 	return "You must speak and provide the information only in: %s. This language setting overrides any other language preference in your personality." % agents_language.strip_edges()
+
+
+func get_user_instruction() -> String:
+	if user_name.strip_edges().is_empty():
+		return ""
+	return "The user you assist is named %s; refer to them by name when addressing them." % user_name.strip_edges()
