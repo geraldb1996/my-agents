@@ -36,6 +36,7 @@ func _ready() -> void:
 	EventBus.agent_output.connect(_on_agent_output)
 	EventBus.agent_selected.connect(_on_agent_selected)
 	EventBus.agent_context_usage.connect(_on_context_usage)
+	EventBus.session_renamed.connect(_on_session_renamed)
 	%NewButton.pressed.connect(_on_new_pressed)
 	%ContextMenu.id_pressed.connect(_on_context_menu_pressed)
 	%ModelMenu.id_pressed.connect(_on_model_menu_pressed)
@@ -95,8 +96,9 @@ func _build_card(profile: AgentProfile) -> Control:
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_label := Label.new()
 	name_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-	name_label.text = profile.name
+	name_label.text = _card_name_text(profile)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.tooltip_text = profile.project
 	info.add_child(name_label)
 	var session_label := Label.new()
 	session_label.name = "SessionLabel"
@@ -104,7 +106,10 @@ func _build_card(profile: AgentProfile) -> Control:
 	session_label.add_theme_font_size_override("font_size", 9)
 	session_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	session_label.text = _session_text(profile)
-	session_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	session_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	session_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	session_label.tooltip_text = tr("Click to rename session")
+	session_label.gui_input.connect(_on_session_label_input.bind(profile.id))
 	info.add_child(session_label)
 	var meta_label := Label.new()
 	meta_label.modulate = ThemeManager.color("muted")
@@ -159,14 +164,95 @@ func _build_card(profile: AgentProfile) -> Control:
 	return card
 
 
+func _card_name_text(profile: AgentProfile) -> String:
+	var folder := _folder_name(profile.project)
+	if folder.is_empty():
+		return profile.name
+	return "%s - %s" % [profile.name, folder]
+
+
+func _folder_name(path: String) -> String:
+	var p := path.strip_edges()
+	if p.is_empty():
+		return ""
+	while p.ends_with("/") or p.ends_with("\\"):
+		p = p.substr(0, p.length() - 1)
+	if p.is_empty():
+		return ""
+	return p.get_file()
+
+
 func _session_text(profile: AgentProfile) -> String:
-	var sid := str(AgentManager.get_session(profile.id).get("opencode_session", ""))
+	var session := AgentManager.get_session(profile.id)
+	var sid := str(session.get("opencode_session", ""))
 	if sid.is_empty():
 		return "New session"
-	var title := AgentManager.get_session_title(sid, profile.project)
+	var title := str(session.get("title_override", ""))
+	if title.is_empty():
+		title = AgentManager.get_session_title(sid, profile.project)
 	if title.is_empty():
 		return tr("Session %s") % sid.right(6)
 	return title
+
+
+func _on_session_label_input(event: InputEvent, agent_id: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		accept_event()
+		_open_rename_dialog(agent_id)
+
+
+var _rename_dialog: Window
+var _rename_edit: LineEdit
+var _rename_agent: String = ""
+
+
+func _open_rename_dialog(agent_id: String) -> void:
+	if str(AgentManager.get_session(agent_id).get("opencode_session", "")).is_empty():
+		return
+	if _rename_dialog == null:
+		_rename_dialog = Window.new()
+		_rename_dialog.title = tr("Rename session")
+		_rename_dialog.exclusive = true
+		_rename_dialog.close_requested.connect(_rename_dialog.hide)
+		var root := VBoxContainer.new()
+		root.set_anchors_preset(Control.PRESET_FULL_RECT)
+		root.add_theme_constant_override("separation", 10)
+		_rename_dialog.add_child(root)
+		var prompt := Label.new()
+		prompt.text = tr("Session name:")
+		root.add_child(prompt)
+		_rename_edit = LineEdit.new()
+		_rename_edit.placeholder_text = tr("Leave empty to restore automatic title")
+		_rename_edit.text_submitted.connect(func(_t: String): _confirm_rename())
+		root.add_child(_rename_edit)
+		var buttons := HBoxContainer.new()
+		var ok := Button.new()
+		ok.text = tr("OK")
+		ok.pressed.connect(_confirm_rename)
+		buttons.add_child(ok)
+		var cancel := Button.new()
+		cancel.text = tr("Cancel")
+		cancel.pressed.connect(_rename_dialog.hide)
+		buttons.add_child(cancel)
+		root.add_child(buttons)
+		add_child(_rename_dialog)
+	_rename_agent = agent_id
+	_rename_edit.text = str(AgentManager.get_session(agent_id).get("title_override", ""))
+	_rename_dialog.popup_centered(Vector2i(360, 150))
+	_rename_edit.grab_focus()
+
+
+func _confirm_rename() -> void:
+	if _rename_dialog == null or not _rename_dialog.visible:
+		return
+	var title := _rename_edit.text.strip_edges()
+	AgentManager.rename_session(_rename_agent, title)
+	_rename_dialog.hide()
+	_update_card_session(_rename_agent)
+
+
+func _on_session_renamed(agent_id: String) -> void:
+	_update_card_session(agent_id)
 
 
 func _update_card_session(agent_id: String) -> void:

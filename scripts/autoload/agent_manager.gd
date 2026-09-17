@@ -170,6 +170,21 @@ func switch_session(agent_id: String, opencode_session_id: String) -> void:
 	set_state(agent_id, "offline")
 
 
+func rename_session(agent_id: String, title: String) -> void:
+	var session := get_session(agent_id)
+	if str(session.get("opencode_session", "")).is_empty():
+		return
+	var clean := title.strip_edges()
+	if clean.is_empty():
+		session.erase("title_override")
+		clean = "(automatic)"
+	else:
+		session["title_override"] = clean
+	ProfileStore.save_session(agent_id, session)
+	emit_output(agent_id, "[session] renamed: %s" % clean)
+	EventBus.session_renamed.emit(agent_id)
+
+
 func _detach_runner(agent_id: String) -> void:
 	var runner: OpenCodeRunner = _runners.get(agent_id)
 	if runner != null and runner.running:
@@ -227,10 +242,11 @@ func _archive_session(agent_id: String) -> void:
 	for entry in history:
 		if str(entry.get("opencode_session", "")) == sid:
 			return
+	var override := str(get_session(agent_id).get("title_override", ""))
 	history.append({
 		"opencode_session": sid,
 		"archived_at": Time.get_unix_time_from_system(),
-		"title": get_session_title(sid, _project_of(agent_id)),
+		"title": override if not override.is_empty() else get_session_title(sid, _project_of(agent_id)),
 	})
 	ProfileStore.save_session_history(agent_id, history)
 
