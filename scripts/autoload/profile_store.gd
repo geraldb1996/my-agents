@@ -3,10 +3,12 @@ extends Node
 const PROFILES_DIR := "user://agents"
 const SESSIONS_DIR := "user://sessions"
 const CHAT_PATH := "user://chat.json"
+const PROJECT_COLORS_PATH := "user://project_colors.json"
 const DEFAULT_AGENTS_DIR := "res://agents/default"
 
 var profiles: Dictionary = {}
 var chat_history: Array = []
+var project_colors: Dictionary = {}
 
 
 func _ready() -> void:
@@ -15,6 +17,7 @@ func _ready() -> void:
 	load_profiles()
 	_seed_default_profiles()
 	load_chat_history()
+	load_project_colors()
 
 
 func _ensure_dirs() -> void:
@@ -129,6 +132,37 @@ func append_chat_message(sender: String, content: String, mentions: Array, times
 func clear_chat_history() -> void:
 	chat_history.clear()
 	_write_text(CHAT_PATH, "[]")
+
+
+func load_project_colors() -> void:
+	var text := _read_text(PROJECT_COLORS_PATH)
+	if text.is_empty():
+		project_colors = {}
+		return
+	var parsed = JSON.parse_string(text)
+	project_colors = parsed if parsed is Dictionary else {}
+
+
+func get_project_color(project: String) -> String:
+	return str(project_colors.get(_project_key(project), ""))
+
+
+func set_project_color(project: String, color: String) -> void:
+	var key := _project_key(project)
+	if key.is_empty():
+		return
+	if color.is_empty():
+		project_colors.erase(key)
+	else:
+		project_colors[key] = color
+	_write_text(PROJECT_COLORS_PATH, JSON.stringify(project_colors, "\t"))
+
+
+func _project_key(project: String) -> String:
+	var p := project.strip_edges()
+	while p.ends_with("/") or p.ends_with("\\"):
+		p = p.substr(0, p.length() - 1)
+	return p
 
 
 func load_session(agent_id: String) -> Dictionary:

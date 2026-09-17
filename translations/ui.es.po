@@ -89,6 +89,39 @@ msgstr "Duplicar agente"
 msgid "Delete Agent"
 msgstr "Eliminar agente"
 
+msgid "Color"
+msgstr "Color"
+
+msgid "No color"
+msgstr "Sin color"
+
+msgid "Set a project first"
+msgstr "Asigna un proyecto primero"
+
+msgid "Red"
+msgstr "Rojo"
+
+msgid "Orange"
+msgstr "Naranja"
+
+msgid "Yellow"
+msgstr "Amarillo"
+
+msgid "Green"
+msgstr "Verde"
+
+msgid "Teal"
+msgstr "Turquesa"
+
+msgid "Blue"
+msgstr "Azul"
+
+msgid "Purple"
+msgstr "Morado"
+
+msgid "Pink"
+msgstr "Rosa"
+
 msgid "Default (auto)"
 msgstr "Predeterminado (automático)"
 

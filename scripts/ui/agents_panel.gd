@@ -22,6 +22,17 @@ const STATE_LABELS := {
 	"offline": "Offline",
 }
 
+const PROJECT_PALETTE: Array[Dictionary] = [
+	{"name": "Red", "color": "e5484d"},
+	{"name": "Orange", "color": "f76b15"},
+	{"name": "Yellow", "color": "e2b53e"},
+	{"name": "Green", "color": "30a46c"},
+	{"name": "Teal", "color": "12a594"},
+	{"name": "Blue", "color": "0091ff"},
+	{"name": "Purple", "color": "8e4ec6"},
+	{"name": "Pink", "color": "d6409f"},
+]
+
 @onready var agent_list: VBoxContainer = %AgentList
 @onready var empty_label: Label = %EmptyLabel
 
@@ -42,17 +53,17 @@ func _ready() -> void:
 	%ModelMenu.id_pressed.connect(_on_model_menu_pressed)
 	%VariantMenu.id_pressed.connect(_on_variant_menu_pressed)
 	%SessionMenu.id_pressed.connect(_on_session_menu_pressed)
+	%ColorMenu.id_pressed.connect(_on_color_menu_pressed)
 	%ContextMenu.set_item_submenu(1, "SessionMenu")
 	%ContextMenu.set_item_submenu(3, "ModelMenu")
 	%ContextMenu.set_item_submenu(4, "VariantMenu")
+	%ContextMenu.set_item_submenu(8, "ColorMenu")
 	ThemeManager.theme_changed.connect(_on_theme_changed)
 	refresh()
 
 
 func _on_theme_changed() -> void:
 	refresh()
-	if not _selected_id.is_empty():
-		_apply_selection_highlight(_selected_id)
 
 
 func refresh() -> void:
@@ -64,6 +75,7 @@ func refresh() -> void:
 		var card := _build_card(profile)
 		agent_list.add_child(card)
 		_cards[profile.id] = card
+	_apply_card_styles()
 
 
 func _notification(what: int) -> void:
@@ -280,6 +292,7 @@ var _context_target: String = ""
 var _menu_models: Array[String] = []
 var _menu_variants: Array[String] = []
 var _menu_sessions: Array[String] = []
+var _menu_colors: Array[String] = []
 
 
 func _open_context_menu(agent_id: String, at_position: Vector2) -> void:
@@ -290,7 +303,46 @@ func _open_context_menu(agent_id: String, at_position: Vector2) -> void:
 	_populate_model_menu(profile)
 	_populate_variant_menu(profile)
 	_populate_session_menu(agent_id)
+	_populate_color_menu(profile)
 	%ContextMenu.popup(Rect2i(at_position, Vector2(200, 0)))
+
+
+func _populate_color_menu(profile: AgentProfile) -> void:
+	_menu_colors.clear()
+	%ColorMenu.clear()
+	var enabled := not profile.project.strip_edges().is_empty()
+	%ContextMenu.set_item_disabled(8, not enabled)
+	if not enabled:
+		%ColorMenu.add_item("Set a project first", 0)
+		return
+	var current := ProfileStore.get_project_color(profile.project)
+	_menu_colors.append("")
+	%ColorMenu.add_item("No color", 0)
+	%ColorMenu.set_item_checked(0, current.is_empty())
+	for i in PROJECT_PALETTE.size():
+		var entry: Dictionary = PROJECT_PALETTE[i]
+		var hex := str(entry["color"])
+		var id := i + 1
+		_menu_colors.append(hex)
+		%ColorMenu.add_icon_item(_color_icon(hex), str(entry["name"]), id)
+		if current == hex:
+			%ColorMenu.set_item_checked(id, true)
+
+
+func _color_icon(hex: String) -> ImageTexture:
+	var img := Image.create(14, 14, false, Image.FORMAT_RGBA8)
+	img.fill(Color.from_string(hex, Color.WHITE))
+	return ImageTexture.create_from_image(img)
+
+
+func _on_color_menu_pressed(id: int) -> void:
+	if _context_target.is_empty() or id < 0 or id >= _menu_colors.size():
+		return
+	var profile := ProfileStore.get_profile(_context_target)
+	if profile == null:
+		return
+	ProfileStore.set_project_color(profile.project, _menu_colors[id])
+	refresh()
 
 
 func _populate_model_menu(profile: AgentProfile) -> void:
@@ -399,19 +451,44 @@ func _select(agent_id: String) -> void:
 		return
 	_selected_id = agent_id
 	AgentManager.select_agent(agent_id)
-	_apply_selection_highlight(agent_id)
+	_apply_card_styles()
 
 
-func _apply_selection_highlight(agent_id: String) -> void:
+func _apply_card_styles() -> void:
 	for id in _cards:
 		var card: Control = _cards[id]
-		if id == agent_id:
-			var sb := StyleBoxFlat.new()
-			sb.bg_color = ThemeManager.color("selected")
-			sb.set_corner_radius_all(6)
-			card.add_theme_stylebox_override("panel", sb)
-		else:
+		var profile := ProfileStore.get_profile(id)
+		if profile == null:
 			card.remove_theme_stylebox_override("panel")
+			continue
+		var project_color := _project_color(profile.project)
+		var has_color := project_color.a > 0.0
+		var is_selected: bool = id == _selected_id
+		if not is_selected and not has_color:
+			card.remove_theme_stylebox_override("panel")
+			continue
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(8)
+		sb.content_margin_left = 10.0
+		sb.content_margin_right = 10.0
+		sb.content_margin_top = 10.0
+		sb.content_margin_bottom = 10.0
+		if is_selected:
+			sb.bg_color = ThemeManager.color("selected")
+			sb.set_border_width_all(2)
+			sb.border_color = project_color if has_color else ThemeManager.color("accent")
+		else:
+			sb.bg_color = ThemeManager.color("panel")
+			sb.set_border_width_all(2)
+			sb.border_color = project_color
+		card.add_theme_stylebox_override("panel", sb)
+
+
+func _project_color(project: String) -> Color:
+	var hex := ProfileStore.get_project_color(project)
+	if hex.is_empty():
+		return Color(0, 0, 0, 0)
+	return Color.from_string(hex, Color(0, 0, 0, 0))
 
 
 func _on_new_pressed() -> void:
@@ -420,8 +497,6 @@ func _on_new_pressed() -> void:
 
 func _on_profile_saved(_profile: AgentProfile) -> void:
 	refresh()
-	if not _selected_id.is_empty() and _cards.has(_selected_id):
-		_apply_selection_highlight(_selected_id)
 
 
 func _on_profile_deleted(_agent_id: String) -> void:
