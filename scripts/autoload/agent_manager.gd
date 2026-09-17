@@ -96,12 +96,18 @@ func stop_agent(agent_id: String) -> void:
 	var runner: OpenCodeRunner = _runners.get(agent_id)
 	if runner != null and runner.running:
 		runner.stop()
+	if _chat_inbox.has(agent_id):
+		_chat_inbox.erase(agent_id)
+		_chat_depth.erase(agent_id)
+		var profile := get_profile(agent_id)
+		var who := profile.name if profile != null else agent_id
+		_emit_system_chat("Queued messages for %s cleared because the agent was stopped." % who)
 	set_state(agent_id, "offline")
 	ProfileStore.save_session(agent_id, get_session(agent_id))
 	EventBus.agent_stopped.emit(agent_id)
 
 
-func send_task(agent_id: String, task: String) -> int:
+func send_task(agent_id: String, task: String, sender_name: String = "User") -> int:
 	var profile := get_profile(agent_id)
 	if profile == null:
 		return TASK_LAUNCH_FAILED
@@ -119,19 +125,27 @@ func send_task(agent_id: String, task: String) -> int:
 	_chat_depth[agent_id] = 0
 	_relay_seen[agent_id] = {}
 
+	var formatted_task := "[%s] %s" % [sender_name, task]
 	var session := get_session(agent_id)
-	session["task"] = task
+	session["task"] = formatted_task
 	session["state"] = "thinking"
 	ProfileStore.save_session(agent_id, session)
-	EventBus.agent_task_updated.emit(agent_id, task)
+	EventBus.agent_task_updated.emit(agent_id, formatted_task)
 	set_state(agent_id, "thinking")
-	if not _spawn_runner(agent_id, task):
+	if not _spawn_runner(agent_id, formatted_task):
 		return TASK_LAUNCH_FAILED
 	return TASK_OK
 
 
 func send_chat_message(agent_id: String, content: String) -> int:
-	return send_task(agent_id, "[Team chat] %s" % content)
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner != null and runner.running:
+		_enqueue_chat(agent_id, content, 0)
+		var profile := get_profile(agent_id)
+		var who := profile.name if profile != null else agent_id
+		_emit_system_chat("%s is working; your message is queued and will be delivered when it finishes." % who)
+		return TASK_OK
+	return send_task(agent_id, content)
 
 
 func _team_context_for(agent_id: String) -> String:
@@ -213,6 +227,8 @@ func _detach_runner(agent_id: String) -> void:
 	_output_history.erase(agent_id)
 	_last_error.erase(agent_id)
 	_file_status.erase(agent_id)
+	_chat_inbox.erase(agent_id)
+	_chat_depth.erase(agent_id)
 	_clear_pending_requests(agent_id)
 
 
@@ -891,19 +907,18 @@ func _deliver_relay(target_id: String, sender_id: String, text: String, depth: i
 		return
 	if sender != null and not sender.project.is_empty() and sender.project != profile.project:
 		_emit_system_chat("Note: %s works in a different project (%s) than %s; the message will run there." % [profile.name, profile.project, sender_name])
-	var task := "[Team chat] Message from %s: %s" % [sender_name, text]
-	var result := send_task(target_id, task)
+	var result := send_task(target_id, text, sender_name)
 	if result == TASK_OK:
 		_chat_depth[target_id] = depth
 	elif result == TASK_BUSY:
-		_enqueue_chat(target_id, task, depth)
+		_enqueue_chat(target_id, text, depth, sender_name)
 		_emit_system_chat("%s is busy; message from %s queued and will be delivered when it finishes." % [profile.name, sender_name])
 
 
-func _enqueue_chat(agent_id: String, task: String, depth: int) -> void:
+func _enqueue_chat(agent_id: String, task: String, depth: int, sender_name: String = "User") -> void:
 	if not _chat_inbox.has(agent_id):
 		_chat_inbox[agent_id] = []
-	(_chat_inbox[agent_id] as Array).append({"task": task, "depth": depth})
+	(_chat_inbox[agent_id] as Array).append({"task": task, "depth": depth, "sender_name": sender_name})
 
 
 func _deliver_inbox(agent_id: String) -> void:
@@ -916,7 +931,7 @@ func _deliver_inbox(agent_id: String) -> void:
 	var item: Dictionary = queued.pop_front()
 	if queued.is_empty():
 		_chat_inbox.erase(agent_id)
-	var result := send_task(agent_id, str(item.get("task", "")))
+	var result := send_task(agent_id, str(item.get("task", "")), str(item.get("sender_name", "User")))
 	if result == TASK_OK:
 		_chat_depth[agent_id] = int(item.get("depth", 0))
 	elif result == TASK_BUSY:

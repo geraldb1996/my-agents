@@ -25,6 +25,7 @@ var _filter_name := ""
 var _opt_ids: Array[String] = []
 var _copy_menu: PopupMenu
 var _copy_content := ""
+var _reply_agent_id := ""
 var _mention_menu: PopupMenu
 var _mention_tokens: Array[String] = []
 var _message_dialog: AcceptDialog
@@ -201,7 +202,7 @@ func _on_bubble_gui_input(event: InputEvent, content: String, sender: String, ti
 		_show_message_dialog(content, sender, timestamp, agent_id)
 	elif event.button_index == MOUSE_BUTTON_RIGHT:
 		_copy_content = content
-		_show_copy_menu()
+		_show_copy_menu(sender, agent_id)
 
 
 func _show_message_dialog(content: String, sender: String, timestamp: int, agent_id: String) -> void:
@@ -258,17 +259,45 @@ func _find_agent_id_by_name(sender: String) -> String:
 	return ""
 
 
-func _show_copy_menu() -> void:
+func _show_copy_menu(sender: String, agent_id: String) -> void:
 	if _copy_menu == null:
 		_copy_menu = PopupMenu.new()
-		_copy_menu.add_item("Copy message")
-		_copy_menu.id_pressed.connect(_on_copy_id)
+		_copy_menu.id_pressed.connect(_on_copy_menu_id)
 		add_child(_copy_menu)
+	_copy_menu.clear()
+	_copy_menu.add_item("Copy message", 0)
+	_reply_agent_id = agent_id
+	if not agent_id.is_empty():
+		var profile := ProfileStore.get_profile(agent_id)
+		var who := profile.name if profile != null else sender
+		_copy_menu.add_item(tr("Reply to %s") % who, 1)
 	_copy_menu.popup(Rect2i(Vector2i(get_viewport().get_mouse_position()), Vector2i()))
 
 
-func _on_copy_id(_id: int) -> void:
-	DisplayServer.clipboard_set(_copy_content)
+func _on_copy_menu_id(id: int) -> void:
+	match id:
+		0:
+			DisplayServer.clipboard_set(_copy_content)
+		1:
+			_insert_reply_mention()
+
+
+func _insert_reply_mention() -> void:
+	if _reply_agent_id.is_empty():
+		return
+	var profile := ProfileStore.get_profile(_reply_agent_id)
+	if profile == null:
+		return
+	var mention := "@%s " % profile.name.replace(" ", "_")
+	var current := input_edit.text
+	var caret := clampi(input_edit.caret_column, 0, current.length())
+	var prefix := current.substr(0, caret)
+	if not prefix.is_empty() and not prefix.ends_with(" "):
+		prefix += " "
+	var text := prefix + mention + current.substr(caret).trim_prefix(" ")
+	input_edit.text = text
+	input_edit.caret_column = (prefix + mention).length()
+	input_edit.grab_focus()
 
 
 func _on_input_changed(_new_text: String) -> void:
