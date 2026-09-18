@@ -18,6 +18,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - **Nombres de sesión personalizados**: renombra sesiones localmente desde el menú del agente para identificarlas con facilidad.
 - **Skills temporales**: añade skills a la sesión desde el Workspace, con opción de quitarlas individualmente o limpiar la lista.
 - **Ajustes del sistema (Sis)**: activa o desactiva sonidos, cambia la interfaz entre inglés y español y elige los temas `light`, `soft` o `dark`. También puedes indicar el idioma de respuesta de los agentes y tu nombre, que se incorporan a sus instrucciones.
+- **Remote Chat privado**: abre Team Chat desde teléfono o navegador mediante una PWA local, autenticada con token y publicada de forma privada con Tailscale Serve.
 - **Interfaz adaptable**: paneles y diálogos ajustados al tamaño de la ventana, texto nítido al redimensionar y sonidos de notificación del chat.
 
 ## Requisitos
@@ -25,6 +26,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - [Godot 4.7](https://godotengine.org/download) (proyecto Forward Plus; sin addons ni plugins externos)
 - [`opencode` CLI](https://github.com/sst/opencode) disponible en el `PATH`, ya configurada con tus proveedores/modelos
 - Git instalado (para el estado de repositorio por proyecto; opcional)
+- [Tailscale](https://tailscale.com/download) instalado e iniciado en el PC y dispositivo remoto (solo para Remote Chat)
 
 ## Instalación y ejecución
 
@@ -45,6 +47,52 @@ También puedes abrir el proyecto con el editor de Godot (`import` de `project.g
 5. Click derecho sobre un agente para gestionar o renombrar sesiones, cambiar modelo/variante, asignar color al proyecto, editar, duplicar o borrar; click derecho sobre un mensaje del chat para copiarlo o responder al agente con una mención.
 6. Si el agente está ocupado, puedes seguir enviándole mensajes: se pondrán en cola. Los agentes también pueden enviarse tareas mediante menciones; para nombres con espacios, usa guiones bajos, por ejemplo `@Mi_Agente`.
 7. Abre **Sis** para personalizar sonidos, idioma y tema de la interfaz, tu nombre y el idioma de respuesta de los agentes.
+
+## Remote Chat con Tailscale
+
+Remote Chat no abre puertos de red local ni de Internet. La aplicación escucha solo en `127.0.0.1`; Tailscale Serve proporciona una URL HTTPS privada para dispositivos de tu misma tailnet.
+
+### Configurar una vez
+
+1. Instala Tailscale e inicia sesión con la misma cuenta o tailnet en el PC donde ejecutas MyAgents y en el teléfono.
+2. En MyAgents abre la pestaña **Sis**.
+3. En la sección **Remote Chat**, activa **Enable Remote Chat**, conserva el puerto `38471` o elige otro libre, y pulsa **Save**.
+4. En una terminal del PC ejecuta:
+
+   ```bash
+   tailscale serve --bg 38471
+   ```
+
+5. Obtén la URL privada:
+
+   ```bash
+   tailscale serve status
+   ```
+
+   El resultado mostrará una dirección similar a `https://mi-pc.mi-tailnet.ts.net`. Esa es la URL que debes abrir desde el teléfono, no `127.0.0.1` ni la IP `192.168.x.x` del PC.
+6. En **Sis**, pulsa **Copy Token**. En la PWA abierta en el teléfono, pega el token y conéctate. La URL base se completa automáticamente; si no, pega la URL HTTPS obtenida en el paso anterior.
+
+La PWA permite leer y enviar mensajes de Team Chat. No permite ejecutar comandos, explorar archivos, ver perfiles ni acceder a OpenCode.
+
+### Uso diario
+
+1. Inicia MyAgents y asegúrate de que Remote Chat sigue activado en **Sis**.
+2. Abre la URL HTTPS de Tailscale desde el teléfono.
+3. Introduce el token si el navegador no conserva la sesión actual.
+
+### Seguridad y solución de problemas
+
+- No uses `tailscale funnel`, reenvío de puertos del router ni un listener `0.0.0.0`: harían accesible el servicio fuera de tu tailnet.
+- Si `tailscale serve status` muestra `No serve config`, repite `tailscale serve --bg 38471` usando el puerto configurado en **Sis**.
+- Si el navegador no carga la PWA local, confirma que MyAgents está abierto, Remote Chat está activado y usa `http://127.0.0.1:38471/` desde el mismo PC.
+- Si pierdes un teléfono o token, pulsa **Regenerate Token** en **Sis**. El token anterior queda invalidado inmediatamente.
+- Para dejar de publicar el servicio, ejecuta:
+
+  ```bash
+  tailscale serve reset
+  ```
+
+  También puedes desactivar **Enable Remote Chat** y guardar desde **Sis**.
 
 ## Arquitectura
 
