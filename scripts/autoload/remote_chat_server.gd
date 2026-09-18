@@ -125,6 +125,11 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 	if request.has("invalid"):
 		_send(peer, 400, {"error": "bad_request"})
 		return
+	var raw_path := str(request.path)
+	var query_at := raw_path.find("?")
+	var path := raw_path.substr(0, query_at) if query_at >= 0 else raw_path
+	if request.method == "GET" and _send_pwa_asset(peer, path):
+		return
 	var headers: Dictionary = request.headers
 	var host := peer.get_connected_host()
 	if str(headers.get("authorization", "")) != "Bearer " + _token:
@@ -133,9 +138,6 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 		else:
 			_send(peer, 401, {"error": "unauthorized"})
 		return
-	var raw_path := str(request.path)
-	var query_at := raw_path.find("?")
-	var path := raw_path.substr(0, query_at) if query_at >= 0 else raw_path
 	if path == API_PREFIX + "/health" and request.method == "GET":
 		_send(peer, 200, {"ok": true, "version": "v1"})
 		return
@@ -196,7 +198,32 @@ func _allow(key: String, maximum: int) -> bool:
 
 func _send(peer: StreamPeerTCP, status: int, payload: Dictionary) -> void:
 	var body := JSON.stringify(payload)
-	var text := "HTTP/1.1 %s %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n%s" % [status, _status_text(status), body.to_utf8_buffer().size(), body]
+	_send_raw(peer, status, "application/json", body, "no-store")
+
+
+func _send_pwa_asset(peer: StreamPeerTCP, path: String) -> bool:
+	var asset_name := "index.html" if path == "/" else path.trim_prefix("/")
+	if asset_name not in ["index.html", "app.css", "app.js", "manifest.webmanifest", "service-worker.js"]:
+		return false
+	var asset_path := "res://remote-chat/" + asset_name
+	if not FileAccess.file_exists(asset_path):
+		return false
+	var file := FileAccess.open(asset_path, FileAccess.READ)
+	if file == null:
+		return false
+	var content := file.get_as_text()
+	file.close()
+	var content_type := "text/plain"
+	if asset_name.ends_with(".html"): content_type = "text/html; charset=utf-8"
+	elif asset_name.ends_with(".css"): content_type = "text/css; charset=utf-8"
+	elif asset_name.ends_with(".js"): content_type = "application/javascript; charset=utf-8"
+	elif asset_name.ends_with(".webmanifest"): content_type = "application/manifest+json"
+	_send_raw(peer, 200, content_type, content, "public, max-age=3600")
+	return true
+
+
+func _send_raw(peer: StreamPeerTCP, status: int, content_type: String, body: String, cache_control: String) -> void:
+	var text := "HTTP/1.1 %s %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nCache-Control: %s\r\nConnection: close\r\n\r\n%s" % [status, _status_text(status), content_type, body.to_utf8_buffer().size(), cache_control, body]
 	peer.put_data(text.to_utf8_buffer())
 	peer.disconnect_from_host()
 

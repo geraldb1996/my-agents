@@ -37,6 +37,7 @@ func _ready() -> void:
 	dialog.sounds_select.select(1)
 	dialog.ui_language_select.select(1)
 	dialog.ui_theme_select.select(1)
+	dialog.remote_chat_enabled.button_pressed = false
 	dialog.save_button.pressed.emit()
 	await get_tree().process_frame
 	_check(not dialog.visible, "Save closes settings")
