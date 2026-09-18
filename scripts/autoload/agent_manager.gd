@@ -150,7 +150,7 @@ func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, content)
 
 
-func send_user_message(text: String) -> Dictionary:
+func send_user_message(text: String, target_agent_id: String = "") -> Dictionary:
 	var content := text.strip_edges()
 	if content.is_empty():
 		return {"accepted": false, "error": "empty_content"}
@@ -164,6 +164,8 @@ func send_user_message(text: String) -> Dictionary:
 		else:
 			for agent_id in mentions:
 				targets.append(str(agent_id))
+	elif not target_agent_id.is_empty() and ProfileStore.get_profile(target_agent_id) != null:
+		targets.append(target_agent_id)
 	elif not selected_agent_id.is_empty():
 		targets.append(selected_agent_id)
 	var results: Array = []
@@ -187,6 +189,10 @@ func send_user_message(text: String) -> Dictionary:
 
 func get_chat_messages(after_id: String = "", limit: int = 100) -> Dictionary:
 	return ProfileStore.get_chat_messages(after_id, limit)
+
+
+func get_agent_state(agent_id: String) -> String:
+	return str((sessions.get(agent_id, {}) as Dictionary).get("state", "offline"))
 
 
 func _append_and_publish(sender: String, content: String, mentions: Array, is_agent: bool, session_id = null) -> Dictionary:
@@ -315,6 +321,107 @@ func reject_question(agent_id: String, request_id: String) -> void:
 	_pending_questions.erase(agent_id)
 	emit_output(agent_id, "[question] rejected")
 	EventBus.agent_request_resolved.emit(agent_id, request_id)
+
+
+func get_pending_remote_requests() -> Array:
+	var pending: Array = []
+	for agent_id in _pending_permissions:
+		var request: Dictionary = _pending_permissions[agent_id]
+		var profile := get_profile(agent_id)
+		var metadata: Dictionary = request.get("metadata", {}) if request.get("metadata", {}) is Dictionary else {}
+		pending.append({
+			"kind": "permission",
+			"agent_id": agent_id,
+			"agent_name": profile.name if profile != null else agent_id,
+			"request_id": str(request.get("id", "")),
+			"permission": str(request.get("permission", "action")),
+			"patterns": request.get("patterns", []) if request.get("patterns", []) is Array else [],
+			"command": str(metadata.get("command", "")),
+			"path": str(metadata.get("filePath", metadata.get("path", ""))),
+			"can_always": request.get("always", []) is Array and not (request.get("always", []) as Array).is_empty(),
+		})
+	for agent_id in _pending_questions:
+		var request: Dictionary = _pending_questions[agent_id]
+		var profile := get_profile(agent_id)
+		var questions: Array = []
+		for raw_question in request.get("questions", []):
+			if not raw_question is Dictionary:
+				continue
+			var options: Array = []
+			for raw_option in raw_question.get("options", []):
+				if raw_option is Dictionary:
+					options.append({"label": str(raw_option.get("label", "")), "description": str(raw_option.get("description", ""))})
+			questions.append({
+				"header": str(raw_question.get("header", "")),
+				"question": str(raw_question.get("question", "")),
+				"multiple": bool(raw_question.get("multiple", false)),
+				"custom": bool(raw_question.get("custom", false)),
+				"options": options,
+			})
+		pending.append({
+			"kind": "question",
+			"agent_id": agent_id,
+			"agent_name": profile.name if profile != null else agent_id,
+			"request_id": str(request.get("id", "")),
+			"questions": questions,
+		})
+	return pending
+
+
+func respond_remote_request(payload: Dictionary) -> Dictionary:
+	var kind := str(payload.get("kind", ""))
+	var agent_id := str(payload.get("agent_id", ""))
+	var request_id := str(payload.get("request_id", ""))
+	var decision := str(payload.get("decision", ""))
+	var runner: OpenCodeRunner = _runners.get(agent_id)
+	if runner == null or not runner.running:
+		return {"ok": false, "error": "unavailable"}
+	if kind == "permission":
+		var request: Dictionary = _pending_permissions.get(agent_id, {})
+		if request.is_empty() or str(request.get("id", "")) != request_id:
+			return {"ok": false, "error": "stale_request"}
+		if decision not in ["once", "always", "reject"]:
+			return {"ok": false, "error": "invalid_response"}
+		if decision == "always" and (not request.get("always", []) is Array or (request.get("always", []) as Array).is_empty()):
+			return {"ok": false, "error": "invalid_response"}
+		reply_permission(agent_id, request_id, decision)
+		return {"ok": true}
+	if kind == "question":
+		var request: Dictionary = _pending_questions.get(agent_id, {})
+		if request.is_empty() or str(request.get("id", "")) != request_id:
+			return {"ok": false, "error": "stale_request"}
+		if decision == "reject":
+			reject_question(agent_id, request_id)
+			return {"ok": true}
+		if decision != "answer":
+			return {"ok": false, "error": "invalid_response"}
+		var answers = payload.get("answers", null)
+		var questions: Array = request.get("questions", [])
+		if not answers is Array or answers.size() != questions.size():
+			return {"ok": false, "error": "invalid_response"}
+		var validated: Array = []
+		for index in questions.size():
+			if not questions[index] is Dictionary or not answers[index] is Array:
+				return {"ok": false, "error": "invalid_response"}
+			var question: Dictionary = questions[index]
+			var allowed: Array[String] = []
+			for option in question.get("options", []):
+				if option is Dictionary:
+					allowed.append(str(option.get("label", "")))
+			var values: Array = []
+			for raw_value in answers[index]:
+				var value := str(raw_value).strip_edges()
+				if value.is_empty() or value.length() > 1000:
+					return {"ok": false, "error": "invalid_response"}
+				if not allowed.has(value) and not bool(question.get("custom", false)):
+					return {"ok": false, "error": "invalid_response"}
+				values.append(value)
+			if values.is_empty() or (not bool(question.get("multiple", false)) and values.size() > 1):
+				return {"ok": false, "error": "invalid_response"}
+			validated.append(values)
+		reply_question(agent_id, request_id, validated)
+		return {"ok": true}
+	return {"ok": false, "error": "invalid_response"}
 
 
 func _archive_session(agent_id: String) -> void:

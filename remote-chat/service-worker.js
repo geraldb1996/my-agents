@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "remote-chat-assets-v1";
+const CACHE_NAME = "remote-chat-assets-v4";
 const APP_ASSETS = ["./", "./index.html", "./app.css", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

@@ -482,6 +482,12 @@ msgstr "Activar chat remoto"
 msgid "Local port:"
 msgstr "Puerto local:"
 
+msgid "Phone access URL:"
+msgstr "URL de acceso del teléfono:"
+
+msgid "Use the HTTPS URL from Tailscale Serve. The QR includes this URL and the token."
+msgstr "Usa la URL HTTPS de Tailscale Serve. El QR incluye esta URL y el token."
+
 msgid "Access token:"
 msgstr "Token de acceso:"
 
@@ -494,6 +500,9 @@ msgstr "Copiar token"
 msgid "Copy Local API URL"
 msgstr "Copiar URL de API local"
 
+msgid "Show QR"
+msgstr "Mostrar QR"
+
 msgid "Local-only service. Use Tailscale Serve for private HTTPS access."
 msgstr "Servicio solo local. Usa Tailscale Serve para acceso HTTPS privado."
 
@@ -505,3 +514,12 @@ msgstr "URL de API local copiada. Publícala con Tailscale Serve para acceso rem
 
 msgid "Could not start Remote Chat: %s"
 msgstr "No se pudo iniciar chat remoto: %s"
+
+msgid "Enter the phone access URL before generating a QR code."
+msgstr "Introduce la URL de acceso del teléfono antes de generar un código QR."
+
+msgid "Could not generate QR. Install qrencode locally and try again."
+msgstr "No se pudo generar el QR. Instala qrencode localmente y vuelve a intentarlo."
+
+msgid "QR opened locally. It contains the access URL and token only."
+msgstr "QR abierto localmente. Solo contiene la URL de acceso y el token."

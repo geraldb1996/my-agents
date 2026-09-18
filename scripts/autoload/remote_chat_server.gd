@@ -8,6 +8,7 @@ const DEFAULT_PORT := 38471
 
 var enabled := false
 var port := DEFAULT_PORT
+var access_url := ""
 var _token := ""
 var _server := TCPServer.new()
 var _clients: Array[Dictionary] = []
@@ -48,6 +49,11 @@ func get_token() -> String:
 		_token = Crypto.new().generate_random_bytes(32).hex_encode()
 		_save_config()
 	return _token
+
+
+func set_access_url(value: String) -> void:
+	access_url = value.strip_edges().trim_suffix("/")
+	_save_config()
 
 
 func start() -> Error:
@@ -141,6 +147,38 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 	if path == API_PREFIX + "/health" and request.method == "GET":
 		_send(peer, 200, {"ok": true, "version": "v1"})
 		return
+	if path == API_PREFIX + "/agents" and request.method == "GET":
+		_send(peer, 200, {"agents": _remote_agents()})
+		return
+	if path == API_PREFIX + "/requests" and request.method == "GET":
+		_send(peer, 200, {"requests": AgentManager.get_pending_remote_requests()})
+		return
+	if path == API_PREFIX + "/requests/respond" and request.method == "POST":
+		if not str(headers.get("content-type", "")).to_lower().begins_with("application/json"):
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		if not _allow(host + ":response", 20):
+			_send(peer, 429, {"error": "rate_limited"})
+			return
+		var response_payload = JSON.parse_string(request.body)
+		if not response_payload is Dictionary:
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		var response_result := AgentManager.respond_remote_request(response_payload)
+		if bool(response_result.get("ok", false)):
+			_send(peer, 200, response_result)
+		elif str(response_result.get("error", "")) == "stale_request":
+			_send(peer, 409, response_result)
+		elif str(response_result.get("error", "")) == "unavailable":
+			_send(peer, 503, response_result)
+		else:
+			_send(peer, 400, response_result)
+		return
+	if path.begins_with(API_PREFIX + "/avatars/") and request.method == "GET":
+		var agent_id := path.trim_prefix(API_PREFIX + "/avatars/")
+		if not _send_agent_avatar(peer, agent_id):
+			_send(peer, 404, {"error": "not_found"})
+		return
 	if path == API_PREFIX + "/messages" and request.method == "GET":
 		var query := raw_path.substr(query_at + 1) if query_at >= 0 else ""
 		var after := ""
@@ -164,13 +202,17 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 			return
 		var content := str(payload.get("content", "")).strip_edges()
 		var client_message_id := str(payload.get("client_message_id", ""))
+		var target_agent_id := str(payload.get("target_agent_id", ""))
 		if content.is_empty() or client_message_id.is_empty():
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		if not target_agent_id.is_empty() and ProfileStore.get_profile(target_agent_id) == null:
 			_send(peer, 400, {"error": "bad_request"})
 			return
 		if _submissions.has(client_message_id):
 			_send(peer, 200, _submissions[client_message_id])
 			return
-		var result := AgentManager.send_user_message(content)
+		var result := AgentManager.send_user_message(content, target_agent_id)
 		if not bool(result.get("accepted", false)):
 			_send(peer, 503, {"error": "unavailable"})
 			return
@@ -218,8 +260,74 @@ func _send_pwa_asset(peer: StreamPeerTCP, path: String) -> bool:
 	elif asset_name.ends_with(".css"): content_type = "text/css; charset=utf-8"
 	elif asset_name.ends_with(".js"): content_type = "application/javascript; charset=utf-8"
 	elif asset_name.ends_with(".webmanifest"): content_type = "application/manifest+json"
-	_send_raw(peer, 200, content_type, content, "public, max-age=3600")
+	_send_raw(peer, 200, content_type, content, "no-cache")
 	return true
+
+
+func _remote_agents() -> Array:
+	var agents: Array = []
+	for profile_id in ProfileStore.profiles:
+		var profile := ProfileStore.get_profile(profile_id)
+		if profile == null:
+			continue
+		agents.append({
+			"id": profile.id,
+			"name": profile.name,
+			"state": AgentManager.get_agent_state(profile.id),
+			"avatar_url": API_PREFIX + "/avatars/" + profile.id.uri_encode(),
+		})
+	return agents
+
+
+func _send_agent_avatar(peer: StreamPeerTCP, agent_id: String) -> bool:
+	var profile := ProfileStore.get_profile(agent_id.uri_decode())
+	if profile == null:
+		return false
+	var image := _idle_image(profile)
+	if image == null or image.is_empty():
+		return false
+	var bytes := image.save_png_to_buffer()
+	if bytes.is_empty():
+		return false
+	_send_bytes(peer, 200, "image/png", bytes, "no-store")
+	return true
+
+
+func _idle_image(profile: AgentProfile) -> Image:
+	var spec = profile.animations.get("idle", {})
+	if spec is Dictionary:
+		var frames = spec.get("frames", [])
+		if frames is Array and not frames.is_empty():
+			var frame_image := _load_avatar_image(str(frames[0]))
+			if frame_image != null:
+				return frame_image
+		var folder := str(spec.get("folder", ""))
+		if not folder.is_empty():
+			var dir := DirAccess.open(folder)
+			if dir != null:
+				var files := dir.get_files()
+				files.sort()
+				for file_name in files:
+					if file_name.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+						var folder_image := _load_avatar_image(folder.path_join(file_name))
+						if folder_image != null:
+							return folder_image
+		var sheet := str(spec.get("sheet", ""))
+		if not sheet.is_empty():
+			var sheet_image := _load_avatar_image(sheet)
+			if sheet_image != null:
+				var hf := maxi(1, int(spec.get("hf", 1)))
+				var vf := maxi(1, int(spec.get("vf", 1)))
+				return sheet_image.get_region(Rect2i(0, 0, sheet_image.get_width() / hf, sheet_image.get_height() / vf))
+	return _load_avatar_image("res://images/agents/agent.png")
+
+
+func _load_avatar_image(path: String) -> Image:
+	if path.begins_with("res://"):
+		var resource = load(path)
+		if resource is Texture2D:
+			return (resource as Texture2D).get_image()
+	return Image.load_from_file(path)
 
 
 func _send_raw(peer: StreamPeerTCP, status: int, content_type: String, body: String, cache_control: String) -> void:
@@ -228,8 +336,15 @@ func _send_raw(peer: StreamPeerTCP, status: int, content_type: String, body: Str
 	peer.disconnect_from_host()
 
 
+func _send_bytes(peer: StreamPeerTCP, status: int, content_type: String, body: PackedByteArray, cache_control: String) -> void:
+	var headers := "HTTP/1.1 %s %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nCache-Control: %s\r\nConnection: close\r\n\r\n" % [status, _status_text(status), content_type, body.size(), cache_control]
+	peer.put_data(headers.to_utf8_buffer())
+	peer.put_data(body)
+	peer.disconnect_from_host()
+
+
 func _status_text(status: int) -> String:
-	return {200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized", 404: "Not Found", 413: "Payload Too Large", 429: "Too Many Requests", 503: "Service Unavailable"}.get(status, "Error")
+	return {200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized", 404: "Not Found", 409: "Conflict", 413: "Payload Too Large", 429: "Too Many Requests", 503: "Service Unavailable"}.get(status, "Error")
 
 
 func _load_config() -> void:
@@ -238,6 +353,7 @@ func _load_config() -> void:
 		return
 	enabled = bool(config.get_value("remote_chat", "enabled", false))
 	port = clampi(int(config.get_value("remote_chat", "port", DEFAULT_PORT)), 1024, 65535)
+	access_url = str(config.get_value("remote_chat", "access_url", "")).strip_edges().trim_suffix("/")
 	_token = str(config.get_value("remote_chat", "token", ""))
 
 
@@ -245,5 +361,6 @@ func _save_config() -> void:
 	var config := ConfigFile.new()
 	config.set_value("remote_chat", "enabled", enabled)
 	config.set_value("remote_chat", "port", port)
+	config.set_value("remote_chat", "access_url", access_url)
 	config.set_value("remote_chat", "token", _token)
 	config.save(CONFIG_PATH)

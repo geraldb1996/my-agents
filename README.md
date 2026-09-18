@@ -18,7 +18,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - **Nombres de sesión personalizados**: renombra sesiones localmente desde el menú del agente para identificarlas con facilidad.
 - **Skills temporales**: añade skills a la sesión desde el Workspace, con opción de quitarlas individualmente o limpiar la lista.
 - **Ajustes del sistema (Sis)**: activa o desactiva sonidos, cambia la interfaz entre inglés y español y elige los temas `light`, `soft` o `dark`. También puedes indicar el idioma de respuesta de los agentes y tu nombre, que se incorporan a sus instrucciones.
-- **Remote Chat privado**: abre Team Chat desde teléfono o navegador mediante una PWA local, autenticada con token y publicada de forma privada con Tailscale Serve.
+- **Remote Chat privado**: abre Team Chat desde teléfono o navegador mediante una PWA local, autenticada con token y publicada de forma privada con Tailscale Serve; muestra estados y avatar idle de agentes, filtro y respuesta directa.
 - **Interfaz adaptable**: paneles y diálogos ajustados al tamaño de la ventana, texto nítido al redimensionar y sonidos de notificación del chat.
 
 ## Requisitos
@@ -27,6 +27,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - [`opencode` CLI](https://github.com/sst/opencode) disponible en el `PATH`, ya configurada con tus proveedores/modelos
 - Git instalado (para el estado de repositorio por proyecto; opcional)
 - [Tailscale](https://tailscale.com/download) instalado e iniciado en el PC y dispositivo remoto (solo para Remote Chat)
+- [`qrencode`](https://fukuchi.org/works/qrencode/) opcional, para abrir en el teléfono la URL y token mediante **Show QR** desde Sis
 
 ## Instalación y ejecución
 
@@ -71,8 +72,9 @@ Remote Chat no abre puertos de red local ni de Internet. La aplicación escucha 
 
    El resultado mostrará una dirección similar a `https://mi-pc.mi-tailnet.ts.net`. Esa es la URL que debes abrir desde el teléfono, no `127.0.0.1` ni la IP `192.168.x.x` del PC.
 6. En **Sis**, pulsa **Copy Token**. En la PWA abierta en el teléfono, pega el token y conéctate. La URL base se completa automáticamente; si no, pega la URL HTTPS obtenida en el paso anterior.
+7. Opcionalmente, pega esa URL HTTPS en **Phone access URL**, guarda y pulsa **Show QR**. Si `qrencode` está instalado, la aplicación abre un QR local con URL y token para escanear desde el teléfono.
 
-La PWA permite leer y enviar mensajes de Team Chat. No permite ejecutar comandos, explorar archivos, ver perfiles ni acceder a OpenCode.
+La PWA permite leer y enviar mensajes de Team Chat, ver estados y responder solicitudes pendientes de agentes. Los permisos ofrecen únicamente **Allow once**, **Always allow** (cuando OpenCode lo admite) y **Reject**; las preguntas conservan sus opciones y respuesta personalizada. No permite introducir comandos, explorar archivos, ver perfiles ni acceder directamente a OpenCode. Aprobar un permiso sí autoriza al agente a ejecutar la acción mostrada, por lo que debes revisar comando, ruta y patrones antes de aceptarlo.
 
 ### Uso diario
 

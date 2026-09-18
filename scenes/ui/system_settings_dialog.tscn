@@ -145,6 +145,20 @@ min_value = 1024.0
 max_value = 65535.0
 value = 38471.0
 
+[node name="RemoteChatAccessUrlLabel" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+text = "Phone access URL:"
+
+[node name="RemoteChatAccessUrl" type="LineEdit" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "https://desktop.tailnet.ts.net"
+
+[node name="RemoteChatAccessUrlHint" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Use the HTTPS URL from Tailscale Serve. The QR includes this URL and the token."
+
 [node name="RemoteChatTokenLabel" type="Label" parent="Background/Layout/Scroll/Form"]
 layout_mode = 2
 text = "Access token:"
@@ -173,6 +187,11 @@ text = "Copy Token"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Copy Local API URL"
+
+[node name="ShowRemoteChatQrButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Show QR"
 
 [node name="RemoteChatStatus" type="Label" parent="Background/Layout/Scroll/Form"]
 unique_name_in_owner = true

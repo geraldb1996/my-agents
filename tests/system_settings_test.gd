@@ -25,6 +25,7 @@ func _ready() -> void:
 	_check(workspace.info_tabs.current_tab == 2, "Previous workspace tab is preserved")
 	_check(not dialog.agents_language_edit.visible, "None hides language input")
 	_check(dialog.remote_chat_port.value == RemoteChatServer.port, "Remote Chat port loads into settings")
+	_check(dialog.remote_chat_access_url.text == RemoteChatServer.access_url, "Remote Chat access URL loads into settings")
 	_check(not dialog.remote_chat_token.text.is_empty(), "Remote Chat token is available for copying")
 	dialog.agents_language_select.select(1)
 	dialog.agents_language_select.item_selected.emit(1)

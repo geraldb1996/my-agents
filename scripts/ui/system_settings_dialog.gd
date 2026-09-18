@@ -9,6 +9,7 @@ extends Window
 @onready var user_name_edit: LineEdit = %UserNameEdit
 @onready var remote_chat_enabled: CheckBox = %RemoteChatEnabled
 @onready var remote_chat_port: SpinBox = %RemoteChatPort
+@onready var remote_chat_access_url: LineEdit = %RemoteChatAccessUrl
 @onready var remote_chat_token: LineEdit = %RemoteChatToken
 @onready var remote_chat_status: Label = %RemoteChatStatus
 @onready var error_label: Label = %SettingsError
@@ -22,6 +23,7 @@ func _ready() -> void:
 	%RegenerateRemoteChatTokenButton.pressed.connect(_on_regenerate_token_pressed)
 	%CopyRemoteChatTokenButton.pressed.connect(_on_copy_token_pressed)
 	%CopyRemoteChatUrlButton.pressed.connect(_on_copy_url_pressed)
+	%ShowRemoteChatQrButton.pressed.connect(_on_show_qr_pressed)
 	agents_language_select.item_selected.connect(_on_language_mode_selected)
 	agents_language_edit.text_changed.connect(func(_text: String): _update_language_input())
 	get_tree().root.size_changed.connect(_fit_to_application)
@@ -36,6 +38,7 @@ func open() -> void:
 	user_name_edit.text = SystemSettings.user_name
 	remote_chat_enabled.button_pressed = RemoteChatServer.enabled
 	remote_chat_port.value = RemoteChatServer.port
+	remote_chat_access_url.text = RemoteChatServer.access_url
 	remote_chat_token.text = RemoteChatServer.get_token()
 	_update_remote_chat_status()
 	error_label.text = ""
@@ -82,6 +85,7 @@ func _on_save_pressed() -> void:
 	if error != OK:
 		error_label.text = tr("Could not start Remote Chat: %s") % error_string(error)
 		return
+	RemoteChatServer.set_access_url(remote_chat_access_url.text)
 	hide()
 
 
@@ -98,6 +102,21 @@ func _on_copy_token_pressed() -> void:
 func _on_copy_url_pressed() -> void:
 	DisplayServer.clipboard_set("http://127.0.0.1:%s" % int(remote_chat_port.value))
 	remote_chat_status.text = tr("Local API URL copied. Publish it with Tailscale Serve for remote access.")
+
+
+func _on_show_qr_pressed() -> void:
+	var base_url := remote_chat_access_url.text.strip_edges().trim_suffix("/")
+	if not (base_url.begins_with("https://") or base_url.begins_with("http://")):
+		remote_chat_status.text = tr("Enter the phone access URL before generating a QR code.")
+		return
+	var payload := base_url + "#remote_chat_token=" + remote_chat_token.text.uri_encode()
+	var output_path := ProjectSettings.globalize_path("user://remote-chat-qr.png")
+	var result := OS.execute("qrencode", ["-o", output_path, "-s", "8", "-m", "2", payload], [], true)
+	if result != 0 or not FileAccess.file_exists("user://remote-chat-qr.png"):
+		remote_chat_status.text = tr("Could not generate QR. Install qrencode locally and try again.")
+		return
+	OS.shell_open(output_path)
+	remote_chat_status.text = tr("QR opened locally. It contains the access URL and token only.")
 
 
 func _update_remote_chat_status() -> void:

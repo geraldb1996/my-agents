@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#172033">
+  <meta name="theme-color" content="#0a1020">
   <meta name="description" content="Remote Team Chat">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="app.css">
@@ -36,6 +36,27 @@
         <p class="hint">The token is kept only until this browser tab is closed.</p>
         <button type="submit">Connect</button>
       </form>
+    </section>
+
+    <section class="agent-area" aria-label="Agent controls">
+      <label class="agent-filter" for="agent-filter">
+        Send to
+        <select id="agent-filter" disabled>
+          <option value="">All agents</option>
+        </select>
+      </label>
+      <div id="agent-roster" class="agent-roster" aria-live="polite">
+        <p class="roster-empty">Agent roster will appear when connected.</p>
+      </div>
+    </section>
+
+    <section id="attention-area" class="attention-area" aria-labelledby="attention-title" hidden>
+      <div class="attention-heading">
+        <h2 id="attention-title">Needs attention</h2>
+        <span id="attention-count" class="attention-count"></span>
+      </div>
+      <p id="attention-status" class="attention-status" role="status" aria-live="polite"></p>
+      <div id="request-list" class="request-list"></div>
     </section>
 
     <section class="chat" aria-label="Messages">
