@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172033">
+  <meta name="description" content="Remote Team Chat">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app.css">
+  <title>Remote Chat</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">TEAM CHAT</p>
+        <h1>Remote Chat</h1>
+      </div>
+      <button id="settings-toggle" class="icon-button" type="button" aria-label="Connection settings">Settings</button>
+    </header>
+
+    <section id="connection-panel" class="connection-panel" aria-labelledby="connection-title">
+      <div class="panel-heading">
+        <h2 id="connection-title">Connection</h2>
+        <button id="close-settings" class="text-button" type="button">Close</button>
+      </div>
+      <form id="connection-form">
+        <label>
+          API base URL
+          <input id="api-base" type="url" inputmode="url" placeholder="https://desktop.tailnet.ts.net" required>
+        </label>
+        <label>
+          Bearer token
+          <input id="token" type="password" autocomplete="off" spellcheck="false" required>
+        </label>
+        <p class="hint">The token is kept only until this browser tab is closed.</p>
+        <button type="submit">Connect</button>
+      </form>
+    </section>
+
+    <section class="chat" aria-label="Messages">
+      <div id="status" class="status" role="status" aria-live="polite">Configure a connection to begin.</div>
+      <div id="delivery-status" class="delivery-status" aria-live="polite"></div>
+      <ol id="messages" class="messages" aria-live="polite"></ol>
+    </section>
+
+    <form id="message-form" class="composer">
+      <label class="sr-only" for="message-content">Message</label>
+      <textarea id="message-content" rows="2" maxlength="8192" placeholder="Write a message" disabled required></textarea>
+      <button id="send-button" type="submit" disabled>Send</button>
+    </form>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

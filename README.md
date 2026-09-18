@@ -11,6 +11,14 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - **Permisos y preguntas**: si un agente pide permiso o hace una pregunta, aparece un popup con su avatar, el detalle y las opciones (Allow once/Always allow/Reject, o las respuestas disponibles con opción de escribir la tuya).
 - **Sesiones de OpenCode**: cada agente reutiliza su session ID para mantener contexto; al hacer click derecho sobre un agente puedes crear sesión nueva, archivar, borrar o volver a sesiones anteriores.
 - **Modelo/variante en caliente**: cambia de modelo o variante desde el menú contextual del agente sin editar su perfil.
+- **Colaboración entre agentes**: cada agente recibe contexto de sus compañeros y puede delegar tareas mencionándolos en su respuesta. Las menciones entre agentes se entregan como nuevas tareas, con identificación del remitente y límites para evitar cadenas repetitivas.
+- **Cola de mensajes**: si un agente está ocupado, los mensajes del usuario y de sus compañeros quedan pendientes y se entregan cuando termina.
+- **Respuesta rápida en el chat**: el menú contextual de un mensaje de agente permite insertar su mención para responderle.
+- **Organización visual por proyecto**: las tarjetas muestran la carpeta del proyecto y permiten asignar un color compartido por los agentes que trabajan en él.
+- **Nombres de sesión personalizados**: renombra sesiones localmente desde el menú del agente para identificarlas con facilidad.
+- **Skills temporales**: añade skills a la sesión desde el Workspace, con opción de quitarlas individualmente o limpiar la lista.
+- **Ajustes del sistema (Sis)**: activa o desactiva sonidos, cambia la interfaz entre inglés y español y elige los temas `light`, `soft` o `dark`. También puedes indicar el idioma de respuesta de los agentes y tu nombre, que se incorporan a sus instrucciones.
+- **Interfaz adaptable**: paneles y diálogos ajustados al tamaño de la ventana, texto nítido al redimensionar y sonidos de notificación del chat.
 
 ## Requisitos
 
@@ -21,7 +29,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 ## Instalación y ejecución
 
 ```bash
-git clone https://github.com/geraldb1996/my-agents.git
+git clone https://github.com/geraldb1996/my-agents.git my-agents-team
 cd my-agents-team
 godot --path . scenes/main/main.tscn
 ```
@@ -34,20 +42,28 @@ También puedes abrir el proyecto con el editor de Godot (`import` de `project.g
 2. **Selecciónalo** para ver su espacio de trabajo (personaje, archivos, Git, output).
 3. **Asigna una tarea** desde el Workspace o desde el Team Chat (usa `@Nombre` para dirigirte a un agente o `@all` para todo el equipo).
 4. El agente trabaja a través de un `opencode serve` gestionado por la app (eventos en vivo por SSE), su personaje anima el estado y el resultado final llega al Team Chat.
-5. Click derecho sobre un agente para sesiones, modelo/variante, edición, duplicado o borrado; click derecho sobre un mensaje del chat para copiarlo.
+5. Click derecho sobre un agente para gestionar o renombrar sesiones, cambiar modelo/variante, asignar color al proyecto, editar, duplicar o borrar; click derecho sobre un mensaje del chat para copiarlo o responder al agente con una mención.
+6. Si el agente está ocupado, puedes seguir enviándole mensajes: se pondrán en cola. Los agentes también pueden enviarse tareas mediante menciones; para nombres con espacios, usa guiones bajos, por ejemplo `@Mi_Agente`.
+7. Abre **Sis** para personalizar sonidos, idioma y tema de la interfaz, tu nombre y el idioma de respuesta de los agentes.
 
 ## Arquitectura
 
 - **Godot** actúa solo como orquestador visual: no reimplementa el LLM ni las herramientas.
 - **OpenCode CLI** es el backend de ejecución: un `opencode serve` global (autoload `OpenCodeServer`) recibe prompts por HTTP y emite los eventos de cada sesión por SSE, con session ID persistida.
-- Persistencia en JSON (`user://agents/`, `user://sessions/`): perfiles, sesiones e historial de chat.
-- Comunicación entre capas mediante señales (`EventBus`); autoloads: `EventBus`, `ProfileStore`, `AgentManager`.
+- Persistencia local: perfiles en `user://agents/`, sesiones en `user://sessions/`, historial en `user://chat.json`, colores por proyecto en `user://project_colors.json` y ajustes en `user://settings.cfg`.
+- Comunicación entre capas mediante señales (`EventBus`). `AgentManager` coordina la ejecución, las colas de mensajes y la delegación entre agentes; `ProfileStore` gestiona la persistencia de perfiles y chat.
+- `ModelCatalog` y `SkillCatalog` proporcionan los catálogos; `SystemSettings` y `ThemeManager` gestionan preferencias, idioma, sonidos y apariencia.
 
-```
+```text
+agents/default/  → Perfiles iniciales del equipo
 scripts/
-├── autoload/   # EventBus, ProfileStore, AgentManager, catálogos
-├── core/       # OpenCodeRunner (proceso CLI y parsing de eventos)
-└── ui/         # Panels: agents, workspace, chat, editor, personaje
+├── autoload/    → Coordinación, persistencia, servidor, catálogos y ajustes
+├── core/        → OpenCodeRunner y modelos de datos
+└── ui/          → Paneles, chat, editor, personajes y diálogos
+scenes/          → Escenas de Godot
+translations/    → Traducción de la interfaz al español
+tests/           → Escenas y scripts de pruebas
+ui_snd/          → Sonidos de la interfaz
 ```
 
 ## Licencia

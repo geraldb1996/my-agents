@@ -1,5 +1,7 @@
 extends Node
 
+signal chat_message_persisted(message: Dictionary)
+
 const TOOL_STATES := {
 	"bash": "terminal",
 	"edit": "coding",
@@ -146,6 +148,53 @@ func send_chat_message(agent_id: String, content: String) -> int:
 		_emit_system_chat("%s is working; your message is queued and will be delivered when it finishes." % who)
 		return TASK_OK
 	return send_task(agent_id, content)
+
+
+func send_user_message(text: String) -> Dictionary:
+	var content := text.strip_edges()
+	if content.is_empty():
+		return {"accepted": false, "error": "empty_content"}
+	var mentions := ProfileStore.extract_mentions(content)
+	var message := _append_and_publish("user", content, mentions, false)
+	var targets: Array[String] = []
+	if not mentions.is_empty():
+		if mentions.has("all"):
+			for profile_id in ProfileStore.profiles:
+				targets.append(profile_id)
+		else:
+			for agent_id in mentions:
+				targets.append(str(agent_id))
+	elif not selected_agent_id.is_empty():
+		targets.append(selected_agent_id)
+	var results: Array = []
+	if targets.is_empty():
+		_append_and_publish("system", "No agent targeted. Select an agent in the left panel or use @AgentName / @all.", [], false)
+		return {"accepted": true, "message": message, "targets": results}
+	for agent_id in targets:
+		var result := send_chat_message(agent_id, content)
+		results.append({"agent_id": agent_id, "result": result})
+		if result != TASK_OK:
+			var profile := ProfileStore.get_profile(agent_id)
+			var who := profile.name if profile != null else agent_id
+			var reason := "%s not reached (OpenCode failed to launch). Check its output log." % who
+			if result == TASK_NO_PROJECT:
+				reason = "%s has no project set. Open its editor or use Select Folder in Workspace." % who
+			elif result == TASK_BUSY:
+				reason = "%s is busy with another task. Wait for it to finish." % who
+			_append_and_publish("system", reason, [], false)
+	return {"accepted": true, "message": message, "targets": results}
+
+
+func get_chat_messages(after_id: String = "", limit: int = 100) -> Dictionary:
+	return ProfileStore.get_chat_messages(after_id, limit)
+
+
+func _append_and_publish(sender: String, content: String, mentions: Array, is_agent: bool, session_id = null) -> Dictionary:
+	var timestamp := Time.get_unix_time_from_system() * 1000
+	var message := ProfileStore.append_chat_message(sender, content, mentions, timestamp, is_agent, session_id)
+	EventBus.chat_message.emit(sender, content, mentions, timestamp, is_agent)
+	chat_message_persisted.emit(message)
+	return message
 
 
 func _team_context_for(agent_id: String) -> String:
@@ -435,9 +484,7 @@ func emit_chat_error(agent_id: String, message: String) -> void:
 	emit_output(agent_id, "[error] " + message)
 	var profile := get_profile(agent_id)
 	var sender := profile.name if profile != null else agent_id
-	var ts := Time.get_unix_time_from_system() * 1000
-	ProfileStore.append_chat_message(sender, "[error] " + message, [], ts, true)
-	EventBus.chat_message.emit(sender, "[error] " + message, [], ts, true)
+	_append_and_publish(sender, "[error] " + message, [], true)
 
 
 func _spawn_runner(agent_id: String, task: String) -> bool:
@@ -673,6 +720,9 @@ func _emit_context_usage(agent_id: String, part: Dictionary) -> void:
 		pct = minf(roundf(float(context_tokens) / float(limit) * 100.0), 100.0)
 	var session := get_session(agent_id)
 	session["cost_spent"] = float(session.get("cost_spent", 0.0)) + float(part.get("cost", 0.0))
+	session["context_tokens"] = context_tokens
+	session["context_percent"] = pct
+	ProfileStore.save_session(agent_id, session)
 	EventBus.agent_context_usage.emit(agent_id, context_tokens, pct, float(session["cost_spent"]))
 
 
@@ -871,10 +921,8 @@ func _post_reply(agent_id: String, text: String) -> void:
 	var profile := get_profile(agent_id)
 	if profile == null:
 		return
-	var ts := Time.get_unix_time_from_system() * 1000
 	var mentions := ProfileStore.extract_mentions(reply)
-	ProfileStore.append_chat_message(profile.name, reply, mentions, ts, true)
-	EventBus.chat_message.emit(profile.name, reply, mentions, ts, true)
+	_append_and_publish(profile.name, reply, mentions, true)
 	_relay_mentions(agent_id, reply, mentions)
 
 
@@ -940,9 +988,7 @@ func _deliver_inbox(agent_id: String) -> void:
 
 
 func _emit_system_chat(message: String) -> void:
-	var ts := Time.get_unix_time_from_system() * 1000
-	ProfileStore.append_chat_message("system", message, [], ts, false)
-	EventBus.chat_message.emit("system", message, [], ts, false)
+	_append_and_publish("system", message, [], false)
 
 
 func _flash_state(agent_id: String, state: String, duration: float) -> void:

@@ -124,6 +124,61 @@ layout_mode = 2
 autowrap_mode = 2
 text = "Agents use this name to address you. Empty adds no instruction."
 
+[node name="RemoteChatLabel" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Remote Chat"
+
+[node name="RemoteChatEnabled" type="CheckBox" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Enable Remote Chat"
+
+[node name="RemoteChatPortLabel" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+text = "Local port:"
+
+[node name="RemoteChatPort" type="SpinBox" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1024.0
+max_value = 65535.0
+value = 38471.0
+
+[node name="RemoteChatTokenLabel" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+text = "Access token:"
+
+[node name="RemoteChatToken" type="LineEdit" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+editable = false
+secret = true
+
+[node name="RemoteChatActions" type="HBoxContainer" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RegenerateRemoteChatTokenButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Regenerate Token"
+
+[node name="CopyRemoteChatTokenButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Copy Token"
+
+[node name="CopyRemoteChatUrlButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Copy Local API URL"
+
+[node name="RemoteChatStatus" type="Label" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+
 [node name="SettingsError" type="Label" parent="Background/Layout/Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2

@@ -375,54 +375,9 @@ func _hide_mention_menu() -> void:
 
 func _on_send_pressed() -> void:
 	_hide_mention_menu()
-	var text := input_edit.text.strip_edges()
-	if text.is_empty():
-		return
-	var mentions := ProfileStore.extract_mentions(text)
-	var ts := Time.get_unix_time_from_system() * 1000
-	ProfileStore.append_chat_message("user", text, mentions, ts, false)
-	EventBus.chat_message.emit("user", text, mentions, ts, false)
-	input_edit.clear()
-	_route_message(text, mentions)
-
-
-func _route_message(text: String, mentions: Array) -> void:
-	var targets: Array[String] = []
-	if not mentions.is_empty():
-		if mentions.has("all"):
-			for profile_id in ProfileStore.profiles:
-				targets.append(profile_id)
-		else:
-			for id in mentions:
-				targets.append(id)
-	elif not AgentManager.selected_agent_id.is_empty():
-		targets.append(AgentManager.selected_agent_id)
-
-	if targets.is_empty():
-		_add_system_hint("No agent targeted. Select an agent in the left panel or use @AgentName / @all.")
-		return
-
-	for agent_id in targets:
-		var result := AgentManager.send_chat_message(agent_id, text)
-		if result != AgentManager.TASK_OK:
-			var profile := ProfileStore.get_profile(agent_id)
-			var who := profile.name if profile != null else agent_id
-			var reason := ""
-			match result:
-				AgentManager.TASK_NO_PROJECT:
-					reason = "%s has no project set. Open its editor or use Select Folder in Workspace." % who
-				AgentManager.TASK_BUSY:
-					reason = "%s is busy with another task. Wait for it to finish." % who
-				_:
-					reason = "%s not reached (OpenCode failed to launch). Check its output log." % who
-			_add_system_hint(reason)
-
-
-func _add_system_hint(content: String) -> void:
-	var ts := Time.get_unix_time_from_system() * 1000
-	ProfileStore.append_chat_message("system", content, [], ts, false)
-	if _passes_filter("system", false):
-		_add_bubble("system", content, ts, false)
+	var result := AgentManager.send_user_message(input_edit.text)
+	if bool(result.get("accepted", false)):
+		input_edit.clear()
 
 
 func _on_state_changed(agent_id: String, state: String) -> void:

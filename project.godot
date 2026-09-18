@@ -29,6 +29,7 @@ ProfileStore="*res://scripts/autoload/profile_store.gd"
 ModelCatalog="*res://scripts/autoload/model_catalog.gd"
 SkillCatalog="*res://scripts/autoload/skill_catalog.gd"
 AgentManager="*res://scripts/autoload/agent_manager.gd"
+RemoteChatServer="*res://scripts/autoload/remote_chat_server.gd"
 OpenCodeServer="*res://scripts/autoload/open_code_server.gd"
 
 [display]

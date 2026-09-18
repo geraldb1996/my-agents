@@ -7,6 +7,10 @@ extends Window
 @onready var agents_language_select: OptionButton = %AgentsLanguageSelect
 @onready var agents_language_edit: LineEdit = %AgentsLanguageEdit
 @onready var user_name_edit: LineEdit = %UserNameEdit
+@onready var remote_chat_enabled: CheckBox = %RemoteChatEnabled
+@onready var remote_chat_port: SpinBox = %RemoteChatPort
+@onready var remote_chat_token: LineEdit = %RemoteChatToken
+@onready var remote_chat_status: Label = %RemoteChatStatus
 @onready var error_label: Label = %SettingsError
 @onready var save_button: Button = %SaveSettingsButton
 
@@ -15,6 +19,9 @@ func _ready() -> void:
 	close_requested.connect(hide)
 	%CancelSettingsButton.pressed.connect(hide)
 	save_button.pressed.connect(_on_save_pressed)
+	%RegenerateRemoteChatTokenButton.pressed.connect(_on_regenerate_token_pressed)
+	%CopyRemoteChatTokenButton.pressed.connect(_on_copy_token_pressed)
+	%CopyRemoteChatUrlButton.pressed.connect(_on_copy_url_pressed)
 	agents_language_select.item_selected.connect(_on_language_mode_selected)
 	agents_language_edit.text_changed.connect(func(_text: String): _update_language_input())
 	get_tree().root.size_changed.connect(_fit_to_application)
@@ -27,6 +34,10 @@ func open() -> void:
 	agents_language_select.select(0 if SystemSettings.agents_language_mode == "none" else 1)
 	agents_language_edit.text = SystemSettings.agents_language
 	user_name_edit.text = SystemSettings.user_name
+	remote_chat_enabled.button_pressed = RemoteChatServer.enabled
+	remote_chat_port.value = RemoteChatServer.port
+	remote_chat_token.text = RemoteChatServer.get_token()
+	_update_remote_chat_status()
 	error_label.text = ""
 	_update_language_input()
 	popup()
@@ -67,7 +78,30 @@ func _on_save_pressed() -> void:
 	if error != OK:
 		error_label.text = tr("Could not save settings: %s") % error_string(error)
 		return
+	error = RemoteChatServer.configure(remote_chat_enabled.button_pressed, int(remote_chat_port.value))
+	if error != OK:
+		error_label.text = tr("Could not start Remote Chat: %s") % error_string(error)
+		return
 	hide()
+
+
+func _on_regenerate_token_pressed() -> void:
+	remote_chat_token.text = RemoteChatServer.regenerate_token()
+	_update_remote_chat_status()
+
+
+func _on_copy_token_pressed() -> void:
+	DisplayServer.clipboard_set(remote_chat_token.text)
+	remote_chat_status.text = tr("Remote Chat token copied.")
+
+
+func _on_copy_url_pressed() -> void:
+	DisplayServer.clipboard_set("http://127.0.0.1:%s" % int(remote_chat_port.value))
+	remote_chat_status.text = tr("Local API URL copied. Publish it with Tailscale Serve for remote access.")
+
+
+func _update_remote_chat_status() -> void:
+	remote_chat_status.text = tr("Local-only service. Use Tailscale Serve for private HTTPS access.")
 
 
 func _input(event: InputEvent) -> void:

@@ -24,6 +24,8 @@ func _ready() -> void:
 	_check(dialog.size == Vector2i(get_tree().root.get_visible_rect().size), "Settings cover application viewport")
 	_check(workspace.info_tabs.current_tab == 2, "Previous workspace tab is preserved")
 	_check(not dialog.agents_language_edit.visible, "None hides language input")
+	_check(dialog.remote_chat_port.value == RemoteChatServer.port, "Remote Chat port loads into settings")
+	_check(not dialog.remote_chat_token.text.is_empty(), "Remote Chat token is available for copying")
 	dialog.agents_language_select.select(1)
 	dialog.agents_language_select.item_selected.emit(1)
 	_check(dialog.agents_language_edit.visible and dialog.save_button.disabled, "Type requires a nonempty language")
@@ -71,6 +73,12 @@ func _ready() -> void:
 	_check(dialog.agents_language_select.selected == 1 and dialog.agents_language_edit.text == "Japanese", "Dialog restores saved values")
 	_check(dialog.ui_theme_select.selected == 1, "Dialog restores saved theme")
 	_check(dialog.user_name_edit.text == "Gerald", "Dialog restores saved user name")
+	dialog.remote_chat_enabled.button_pressed = false
+	dialog.remote_chat_port.value = 38471
+	dialog.save_button.pressed.emit()
+	await get_tree().process_frame
+	_check(not RemoteChatServer.enabled, "Remote Chat can be disabled from settings")
+	dialog.open()
 	dialog.sounds_select.select(0)
 	dialog.ui_language_select.select(0)
 	dialog.user_name_edit.text = "Wrong"

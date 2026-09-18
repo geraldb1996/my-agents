@@ -472,3 +472,36 @@ msgstr "Intermedio (soft)"
 
 msgid "Dark"
 msgstr "Oscuro"
+
+msgid "Remote Chat"
+msgstr "Chat remoto"
+
+msgid "Enable Remote Chat"
+msgstr "Activar chat remoto"
+
+msgid "Local port:"
+msgstr "Puerto local:"
+
+msgid "Access token:"
+msgstr "Token de acceso:"
+
+msgid "Regenerate Token"
+msgstr "Regenerar token"
+
+msgid "Copy Token"
+msgstr "Copiar token"
+
+msgid "Copy Local API URL"
+msgstr "Copiar URL de API local"
+
+msgid "Local-only service. Use Tailscale Serve for private HTTPS access."
+msgstr "Servicio solo local. Usa Tailscale Serve para acceso HTTPS privado."
+
+msgid "Remote Chat token copied."
+msgstr "Token de chat remoto copiado."
+
+msgid "Local API URL copied. Publish it with Tailscale Serve for remote access."
+msgstr "URL de API local copiada. Publícala con Tailscale Serve para acceso remoto."
+
+msgid "Could not start Remote Chat: %s"
+msgstr "No se pudo iniciar chat remoto: %s"

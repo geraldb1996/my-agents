@@ -115,23 +115,85 @@ func load_chat_history() -> void:
 		return
 	var parsed = JSON.parse_string(text)
 	if parsed is Array:
-		chat_history = parsed
+		chat_history = []
+		var migrated := false
+		for raw_message in parsed:
+			if raw_message is Dictionary:
+				var message := _normalize_chat_message(raw_message)
+				migrated = migrated or not raw_message.has("id") or not raw_message.has("session_id")
+				chat_history.append(message)
+		if migrated:
+			_write_chat_history()
 
 
-func append_chat_message(sender: String, content: String, mentions: Array, timestamp: int, is_agent: bool) -> void:
-	chat_history.append({
+func append_chat_message(sender: String, content: String, mentions: Array, timestamp: int, is_agent: bool, session_id = null) -> Dictionary:
+	var message := {
+		"id": _new_chat_id(),
 		"sender": sender,
 		"content": content,
-		"mentions": mentions,
+		"mentions": mentions.duplicate(),
 		"timestamp": timestamp,
 		"is_agent": is_agent,
-	})
-	_write_text(CHAT_PATH, JSON.stringify(chat_history, "\t"))
+		"session_id": session_id,
+	}
+	chat_history.append(message)
+	_write_chat_history()
+	return message
 
 
 func clear_chat_history() -> void:
 	chat_history.clear()
-	_write_text(CHAT_PATH, "[]")
+	_write_chat_history()
+
+
+func get_chat_messages(after_id: String = "", limit: int = 100) -> Dictionary:
+	var capped_limit := clampi(limit, 1, 250)
+	var start := 0
+	if not after_id.is_empty():
+		for index in chat_history.size():
+			if str((chat_history[index] as Dictionary).get("id", "")) == after_id:
+				start = index + 1
+				break
+	else:
+		start = maxi(0, chat_history.size() - capped_limit)
+	var end := mini(chat_history.size(), start + capped_limit)
+	var messages: Array = []
+	for index in range(start, end):
+		messages.append((chat_history[index] as Dictionary).duplicate(true))
+	return {
+		"messages": messages,
+		"next_cursor": str(messages.back().get("id", "")) if not messages.is_empty() else after_id,
+		"has_more": end < chat_history.size(),
+	}
+
+
+func _normalize_chat_message(raw_message: Dictionary) -> Dictionary:
+	return {
+		"id": str(raw_message.get("id", _new_chat_id())),
+		"sender": str(raw_message.get("sender", "system")),
+		"content": str(raw_message.get("content", "")),
+		"mentions": raw_message.get("mentions", []) if raw_message.get("mentions", []) is Array else [],
+		"timestamp": int(raw_message.get("timestamp", 0)),
+		"is_agent": bool(raw_message.get("is_agent", false)),
+		"session_id": raw_message.get("session_id", null),
+	}
+
+
+func _new_chat_id() -> String:
+	return "msg_" + Crypto.new().generate_random_bytes(16).hex_encode()
+
+
+func _write_chat_history() -> Error:
+	var temporary_path := CHAT_PATH + ".tmp"
+	var err := _write_text(temporary_path, JSON.stringify(chat_history, "\t"))
+	if err != OK:
+		return err
+	var absolute_path := ProjectSettings.globalize_path(CHAT_PATH)
+	var temporary_absolute_path := ProjectSettings.globalize_path(temporary_path)
+	err = DirAccess.rename_absolute(temporary_absolute_path, absolute_path)
+	if err != OK:
+		return err
+	return OK
 
 
 func load_project_colors() -> void:

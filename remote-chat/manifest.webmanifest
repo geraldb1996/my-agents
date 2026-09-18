@@ -1,0 +1,8 @@
+{
+  "name": "Remote Team Chat",
+  "short_name": "Remote Chat",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101725",
+  "theme_color": "#172033"
+}

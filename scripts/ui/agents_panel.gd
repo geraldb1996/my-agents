@@ -90,7 +90,7 @@ func get_selected_id() -> String:
 
 func _build_card(profile: AgentProfile) -> Control:
 	var card := PanelContainer.new()
-	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.gui_input.connect(_on_card_input.bind(profile.id))
 	card.custom_minimum_size = Vector2(0, 72)
 
@@ -100,6 +100,7 @@ func _build_card(profile: AgentProfile) -> Control:
 
 	var avatar := CharacterAvatar.new()
 	avatar.custom_minimum_size = Vector2(48, 48)
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	avatar.set_profile(profile)
 	row.add_child(avatar)
 
@@ -118,7 +119,7 @@ func _build_card(profile: AgentProfile) -> Control:
 	session_label.add_theme_font_size_override("font_size", 9)
 	session_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	session_label.text = _session_text(profile)
-	session_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	session_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	session_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	session_label.tooltip_text = tr("Click to rename session")
 	session_label.gui_input.connect(_on_session_label_input.bind(profile.id))
@@ -164,6 +165,7 @@ func _build_card(profile: AgentProfile) -> Control:
 	context_pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	context_row.add_child(context_pct)
 	info.add_child(context_row)
+	_restore_context_usage(profile.id, context_bar, context_pct)
 	row.add_child(info)
 
 	card.set_meta("state_label", state_label)
@@ -528,6 +530,17 @@ func _update_card_state(agent_id: String, state: String) -> void:
 
 func _get_state(agent_id: String) -> String:
 	return str(AgentManager.get_session(agent_id).get("state", "offline"))
+
+
+func _restore_context_usage(agent_id: String, bar: ProgressBar, pct_label: Label) -> void:
+	var usage := AgentManager.get_session(agent_id)
+	var percent := float(usage.get("context_percent", 0.0))
+	var tokens := int(usage.get("context_tokens", 0))
+	var cost := float(usage.get("cost_spent", 0.0))
+	bar.value = percent
+	if tokens > 0 or cost > 0.0:
+		pct_label.text = "%d%% · %s · $%.2f" % [int(percent), _fmt_tokens(tokens), cost]
+	_update_bar_color(bar, percent)
 
 
 func _on_context_usage(agent_id: String, tokens: int, percent: float, cost: float) -> void:
