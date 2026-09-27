@@ -137,35 +137,16 @@ The service listens only on `127.0.0.1`. This prevents other devices on your loc
 
 1. Install Tailscale on the computer running MyAgents and on your phone.
 2. Sign in to the same Tailscale account or tailnet on both devices.
-3. In MyAgents, open **Sis**.
-4. Enable **Remote Chat**.
-5. Keep port `38471`, or choose another free port.
-6. Select **Save**.
-7. On the computer, run:
-
-   ```bash
-   tailscale serve --bg 38471
-   ```
-
-8. Display your private address:
-
-   ```bash
-   tailscale serve status
-   ```
-
-9. Open the displayed `https://...ts.net` address on your phone. Do not use the computer's `127.0.0.1` or `192.168.x.x` address from the phone.
-10. In **Sis**, select **Copy Token** and enter that token in Remote Chat.
+3. In MyAgents, open **Sis** and leave **Access URL (optional)** empty.
+4. Keep port `38471`, or choose another free local port.
+5. Select **Show QR** or **Copy Access Link**. MyAgents enables Remote Chat, starts Tailscale Serve when needed, and obtains the private HTTPS address automatically.
+6. Scan the QR on your phone, or open the copied link. Both include the access token. If Tailscale is not signed in or Serve cannot start, Sis displays an error. Enter a custom URL only if you use a different proxy.
 
 The token is kept in browser session storage, so you may need to enter it again after closing the browser session.
 
-### Optional QR Setup
+### QR Access
 
-If `qrencode` is installed:
-
-1. Paste the HTTPS Tailscale address into **Phone access URL** in Sis.
-2. Save the settings.
-3. Select **Show QR**.
-4. Scan the generated QR code with your phone.
+If `qrencode` is installed on your computer, select **Show QR** in Sis and scan the generated code. Otherwise, Sis copies the access link so you can send it to your phone.
 
 The QR contains the private address and access token. Treat it like a password and do not share screenshots of it.
 

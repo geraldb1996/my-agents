@@ -16,6 +16,8 @@ extends Window
 @onready var error_label: Label = %SettingsError
 @onready var save_button: Button = %SaveSettingsButton
 
+var _remote_setup_thread: Thread
+
 
 func _ready() -> void:
 	close_requested.connect(hide)
@@ -104,8 +106,7 @@ func _on_copy_token_pressed() -> void:
 
 
 func _on_copy_url_pressed() -> void:
-	DisplayServer.clipboard_set(_remote_chat_access_link())
-	remote_chat_status.text = tr("Remote Chat access link copied.")
+	_start_remote_access(false)
 
 
 func _remote_chat_access_link() -> String:
@@ -116,18 +117,104 @@ func _remote_chat_access_link() -> String:
 
 
 func _on_show_qr_pressed() -> void:
-	var base_url := remote_chat_access_url.text.strip_edges().trim_suffix("/")
-	if not (base_url.begins_with("https://") or base_url.begins_with("http://")):
-		remote_chat_status.text = tr("Enter the phone access URL before generating a QR code.")
+	_start_remote_access(true)
+
+
+func _start_remote_access(show_qr: bool) -> void:
+	if _remote_setup_thread != null:
 		return
-	var payload := base_url + "#remote_chat_token=" + remote_chat_token.text.uri_encode()
+	var error := RemoteChatServer.configure(true, int(remote_chat_port.value))
+	if error != OK:
+		remote_chat_status.text = tr("Could not start Remote Chat: %s") % error_string(error)
+		return
+	remote_chat_enabled.button_pressed = true
+	remote_chat_status.text = tr("Preparing phone access...")
+	%CopyRemoteChatUrlButton.disabled = true
+	%ShowRemoteChatQrButton.disabled = true
+	_remote_setup_thread = Thread.new()
+	_remote_setup_thread.start(_remote_setup_worker.bind(int(remote_chat_port.value), remote_chat_access_url.text.strip_edges().trim_suffix("/"), show_qr))
+
+
+func _remote_setup_worker(local_port: int, manual_url: String, show_qr: bool) -> void:
+	var output: Array = []
+	var code := OS.execute("tailscale", ["status", "--json"], output, true)
+	var status = JSON.parse_string("".join(PackedStringArray(output))) if code == OK else null
+	var auto_url := _tailscale_access_url(status)
+	if not manual_url.is_empty() and manual_url != auto_url:
+		if not (manual_url.begins_with("https://") or manual_url.begins_with("http://")):
+			call_deferred("_remote_setup_finished", "", show_qr, "Enter a valid HTTP or HTTPS access URL.")
+			return
+		call_deferred("_remote_setup_finished", manual_url, show_qr, "")
+		return
+	if auto_url.is_empty():
+		call_deferred("_remote_setup_finished", "", show_qr, "Install Tailscale and sign in on your computer and phone.")
+		return
+	output.clear()
+	code = OS.execute("tailscale", ["serve", "status", "--json"], output, true)
+	var serve_status = JSON.parse_string("".join(PackedStringArray(output))) if code == OK else null
+	if not _tailscale_serves_port(serve_status, auto_url, local_port):
+		output.clear()
+		code = OS.execute("tailscale", ["serve", "--bg", "--yes", str(local_port)], output, true)
+		if code != OK:
+			call_deferred("_remote_setup_finished", "", show_qr, "Could not start Tailscale Serve. Check Tailscale on your computer.")
+			return
+	call_deferred("_remote_setup_finished", auto_url, show_qr, "")
+
+
+func _tailscale_access_url(status: Variant) -> String:
+	if status is not Dictionary or status.get("BackendState", "") != "Running":
+		return ""
+	var self_node: Variant = status.get("Self", {})
+	if self_node is not Dictionary:
+		return ""
+	var domain := str(self_node.get("DNSName", "")).trim_suffix(".")
+	return "https://" + domain if not domain.is_empty() else ""
+
+
+func _tailscale_serves_port(status: Variant, url: String, local_port: int) -> bool:
+	if status is not Dictionary:
+		return false
+	var web: Variant = status.get("Web", {})
+	if web is not Dictionary:
+		return false
+	var site: Variant = web.get(url.trim_prefix("https://") + ":443", {})
+	if site is not Dictionary:
+		return false
+	var handlers: Variant = site.get("Handlers", {})
+	if handlers is not Dictionary:
+		return false
+	var root: Variant = handlers.get("/", {})
+	return root is Dictionary and str(root.get("Proxy", "")) == "http://127.0.0.1:%d" % local_port
+
+
+func _remote_setup_finished(url: String, show_qr: bool, error: String) -> void:
+	_remote_setup_thread.wait_to_finish()
+	_remote_setup_thread = null
+	%CopyRemoteChatUrlButton.disabled = false
+	%ShowRemoteChatQrButton.disabled = false
+	if not error.is_empty():
+		remote_chat_status.text = tr(error)
+		return
+	remote_chat_access_url.text = url
+	RemoteChatServer.set_access_url(url)
+	var link := _remote_chat_access_link()
+	if not show_qr:
+		DisplayServer.clipboard_set(link)
+		remote_chat_status.text = tr("Remote Chat access link copied.")
+		return
 	var output_path := ProjectSettings.globalize_path("user://remote-chat-qr.png")
-	var result := OS.execute("qrencode", ["-o", output_path, "-s", "8", "-m", "2", payload], [], true)
+	var result := OS.execute("qrencode", ["-o", output_path, "-s", "8", "-m", "2", link], [], true)
 	if result != 0 or not FileAccess.file_exists("user://remote-chat-qr.png"):
-		remote_chat_status.text = tr("Could not generate QR. Install qrencode locally and try again.")
+		DisplayServer.clipboard_set(link)
+		remote_chat_status.text = tr("Could not generate QR. Install qrencode; access link copied instead.")
 		return
 	OS.shell_open(output_path)
 	remote_chat_status.text = tr("QR opened locally. It contains the access URL and token only.")
+
+
+func _exit_tree() -> void:
+	if _remote_setup_thread != null:
+		_remote_setup_thread.wait_to_finish()
 
 
 func _on_restore_defaults_pressed() -> void:

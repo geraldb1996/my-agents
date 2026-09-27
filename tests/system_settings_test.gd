@@ -43,6 +43,12 @@ func _ready() -> void:
 	dialog.remote_chat_access_url.text = "https://desktop.tailnet.ts.net"
 	dialog.remote_chat_token.text = "test-token"
 	_check(dialog._remote_chat_access_link() == "https://desktop.tailnet.ts.net#remote_chat_token=test-token", "Remote Chat access link includes its token")
+	var tail_status := {"BackendState": "Running", "Self": {"DNSName": "desktop.tailnet.ts.net."}}
+	_check(dialog._tailscale_access_url(tail_status) == "https://desktop.tailnet.ts.net", "Tailscale DNS name becomes the phone URL")
+	_check(dialog._tailscale_access_url({"BackendState": "Stopped", "Self": {"DNSName": "desktop.tailnet.ts.net."}}).is_empty(), "Offline Tailscale does not produce a phone URL")
+	var serve_status := {"Web": {"desktop.tailnet.ts.net:443": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:38471"}}}}}
+	_check(dialog._tailscale_serves_port(serve_status, "https://desktop.tailnet.ts.net", 38471), "Matching Tailscale Serve configuration can be reused")
+	_check(not dialog._tailscale_serves_port(serve_status, "https://desktop.tailnet.ts.net", 38472), "Wrong local port requires reconfiguration")
 	dialog.remote_chat_access_url.text = saved_access_url
 	dialog.remote_chat_token.text = saved_token
 	dialog.agents_language_select.select(1)

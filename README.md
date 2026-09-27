@@ -57,30 +57,16 @@ Remote Chat no abre puertos de red local ni de Internet. La aplicación escucha 
 
 1. Instala Tailscale e inicia sesión con la misma cuenta o tailnet en el PC donde ejecutas MyAgents y en el teléfono.
 2. En MyAgents abre la pestaña **Sis**.
-3. En la sección **Remote Chat**, activa **Enable Remote Chat**, conserva el puerto `38471` o elige otro libre, y pulsa **Save**.
-4. En una terminal del PC ejecuta:
-
-   ```bash
-   tailscale serve --bg 38471
-   ```
-
-5. Obtén la URL privada:
-
-   ```bash
-   tailscale serve status
-   ```
-
-   El resultado mostrará una dirección similar a `https://mi-pc.mi-tailnet.ts.net`. Esa es la URL que debes abrir desde el teléfono, no `127.0.0.1` ni la IP `192.168.x.x` del PC.
-6. En **Sis**, pulsa **Copy Token**. En la PWA abierta en el teléfono, pega el token y conéctate. La URL base se completa automáticamente; si no, pega la URL HTTPS obtenida en el paso anterior.
-7. Opcionalmente, pega esa URL HTTPS en **Phone access URL**, guarda y pulsa **Show QR**. Si `qrencode` está instalado, la aplicación abre un QR local con URL y token para escanear desde el teléfono.
+3. En **Remote Chat**, deja vacío **Access URL (optional)** y pulsa **Show QR** o **Copy Access Link**. MyAgents activa el servicio local, configura Tailscale Serve y obtiene la URL HTTPS privada automáticamente. Puedes elegir otro puerto local antes de pulsar el botón.
+4. Escanea el QR desde el teléfono (requiere `qrencode` en el PC) o abre el enlace copiado. Ambos incluyen el token de acceso, sin necesidad de escribirlo. Si Tailscale o Serve no están disponibles, Sis mostrará el motivo. Para otro proxy, introduce su URL en **Access URL (optional)**.
 
 La PWA permite leer y enviar mensajes de Team Chat, ver estados y responder solicitudes pendientes de agentes. Los permisos ofrecen únicamente **Allow once**, **Always allow** (cuando OpenCode lo admite) y **Reject**; las preguntas conservan sus opciones y respuesta personalizada. No permite introducir comandos, explorar archivos, ver perfiles ni acceder directamente a OpenCode. Aprobar un permiso sí autoriza al agente a ejecutar la acción mostrada, por lo que debes revisar comando, ruta y patrones antes de aceptarlo.
 
 ### Uso diario
 
 1. Inicia MyAgents y asegúrate de que Remote Chat sigue activado en **Sis**.
-2. Abre la URL HTTPS de Tailscale desde el teléfono.
-3. Introduce el token si el navegador no conserva la sesión actual.
+2. Escanea el QR o usa **Copy Access Link** desde Sis para abrir el enlace en el teléfono.
+3. Introduce el token con **Copy Token** solo si el navegador no conserva la sesión y ya no tienes el enlace.
 
 ### Seguridad y solución de problemas
 

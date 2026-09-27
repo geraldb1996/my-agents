@@ -147,7 +147,7 @@ value = 38471.0
 
 [node name="RemoteChatAccessUrlLabel" type="Label" parent="Background/Layout/Scroll/Form"]
 layout_mode = 2
-text = "Phone access URL:"
+text = "Access URL (optional):"
 
 [node name="RemoteChatAccessUrl" type="LineEdit" parent="Background/Layout/Scroll/Form"]
 unique_name_in_owner = true
@@ -157,7 +157,7 @@ placeholder_text = "https://desktop.tailnet.ts.net"
 [node name="RemoteChatAccessUrlHint" type="Label" parent="Background/Layout/Scroll/Form"]
 layout_mode = 2
 autowrap_mode = 2
-text = "Use the HTTPS URL from Tailscale Serve. The QR includes this URL and the token."
+text = "Leave blank to set up Tailscale Serve automatically when copying the link or showing the QR."
 
 [node name="RemoteChatTokenLabel" type="Label" parent="Background/Layout/Scroll/Form"]
 layout_mode = 2

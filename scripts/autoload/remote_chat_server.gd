@@ -29,6 +29,8 @@ func _exit_tree() -> void:
 
 
 func configure(is_enabled: bool, requested_port: int = DEFAULT_PORT) -> Error:
+	if _server.is_listening() and port != clampi(requested_port, 1024, 65535):
+		stop()
 	enabled = is_enabled
 	port = clampi(requested_port, 1024, 65535)
 	if _token.is_empty():
