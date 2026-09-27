@@ -4,8 +4,7 @@ extends Node
 signal event_received(agent_id: String, event: Dictionary)
 signal process_finished(agent_id: String, exit_code: int)
 
-const MAX_SSE_CHUNKS_PER_POLL := 8
-const MAX_SSE_EVENTS_PER_POLL := 16
+const POLL_INTERVAL_MS := 600
 
 var agent_id: String = ""
 var agent_name: String = ""
@@ -23,10 +22,12 @@ var running: bool = false
 var stall_timeout_ms: int = 120000
 
 var _prompt: String = ""
-var _http: HTTPClient
-var _sse_buffer: String = ""
-var _sse_requested: bool = false
-var _sse_connected: bool = false
+var _poll_pending: bool = false
+var _prompt_submitted: bool = false
+var _next_poll_ms: int = 0
+var _message_ids: Dictionary = {}
+var _permission_ids: Dictionary = {}
+var _form_ids: Dictionary = {}
 var _finished: bool = false
 var _completed_ok: bool = false
 var _prompt_failed: bool = false
@@ -56,10 +57,12 @@ func start(opts: Dictionary) -> bool:
 		return false
 
 	_prompt = _build_prompt()
-	_http = null
-	_sse_buffer = ""
-	_sse_requested = false
-	_sse_connected = false
+	_poll_pending = false
+	_prompt_submitted = false
+	_next_poll_ms = 0
+	_message_ids.clear()
+	_permission_ids.clear()
+	_form_ids.clear()
 	_finished = false
 	_completed_ok = false
 	_prompt_failed = false
@@ -77,7 +80,8 @@ func start(opts: Dictionary) -> bool:
 func poll() -> void:
 	if not running:
 		return
-	_pump_stream()
+	if _prompt_submitted and not _poll_pending and Time.get_ticks_msec() >= _next_poll_ms and not session_id.is_empty():
+		_poll_messages()
 	if not running:
 		return
 	if stall_timeout_ms > 0 and not _awaiting_user and Time.get_ticks_msec() - _last_activity_ms > stall_timeout_ms:
@@ -94,22 +98,39 @@ func stop() -> void:
 
 
 func reply_permission(request_id: String, reply: String, message: String = "") -> void:
-	var body := {"reply": reply}
+	var body := {"decision": reply}
 	if not message.is_empty():
 		body["message"] = message
-	OpenCodeServer.post("/permission/%s/reply?directory=%s" % [request_id, _dir_query()], body, _on_reply_result.bind("permission"))
+	OpenCodeServer.post("/api/session/%s/permission/%s/reply" % [session_id, request_id], body, _on_reply_result.bind("permission"))
 	_awaiting_user = false
 	_last_activity_ms = Time.get_ticks_msec()
 
 
 func reply_question(request_id: String, answers: Array) -> void:
-	OpenCodeServer.post("/question/%s/reply?directory=%s" % [request_id, _dir_query()], {"answers": answers}, _on_reply_result.bind("question"))
+	var answer := {}
+	var fields: Array = _form_ids.get(request_id, [])
+	for i in mini(answers.size(), fields.size()):
+		var field: Dictionary = fields[i]
+		var selected: Array = answers[i]
+		var values := []
+		for label in selected:
+			var value := str(label)
+			for option in field.get("options", []):
+				if option is Dictionary and str(option.get("label", "")) == value:
+					value = str(option.get("value", value))
+					break
+			values.append(value)
+		if str(field.get("type", "")) == "multiselect":
+			answer[str(field.get("key", ""))] = values
+		elif not values.is_empty():
+			answer[str(field.get("key", ""))] = values[0]
+	OpenCodeServer.post("/api/session/%s/form/%s/reply" % [session_id, request_id], {"answer": answer}, _on_reply_result.bind("question"))
 	_awaiting_user = false
 	_last_activity_ms = Time.get_ticks_msec()
 
 
 func reject_question(request_id: String) -> void:
-	OpenCodeServer.post("/question/%s/reject?directory=%s" % [request_id, _dir_query()], {}, _on_reply_result.bind("question"))
+	OpenCodeServer.delete_json("/api/session/%s/form/%s" % [session_id, request_id], _on_reply_result.bind("question"))
 	_awaiting_user = false
 	_last_activity_ms = Time.get_ticks_msec()
 
@@ -124,186 +145,230 @@ func _on_server_ready(ok: bool) -> void:
 	if not running:
 		return
 	if not ok:
-		_fail("Failed to start opencode server. Is it in PATH?")
+		_fail(OpenCodeServer.startup_error())
 		return
 	if session_id.is_empty():
-		OpenCodeServer.post("/session?directory=%s" % _dir_query(), {}, _on_session_created)
+		OpenCodeServer.post("/api/session", {"location": {"directory": project}}, _on_session_created)
 	else:
-		_start_stream()
+		_load_baseline()
 
 
 func _on_session_created(code: int, data: Variant) -> void:
 	if not running:
 		return
-	if code < 200 or code >= 300 or not (data is Dictionary) or str((data as Dictionary).get("id", "")).is_empty():
+	var session: Variant = data.get("data", {}) if data is Dictionary else {}
+	if code < 200 or code >= 300 or not (session is Dictionary) or str(session.get("id", "")).is_empty():
 		_fail("Failed to create opencode session (HTTP %d)" % code)
 		return
-	session_id = str((data as Dictionary)["id"])
+	session_id = str(session["id"])
 	event_received.emit(agent_id, {"type": "session_created", "sessionID": session_id})
-	_start_stream()
+	_send_prompt()
 
 
-func _start_stream() -> void:
-	_http = HTTPClient.new()
-	if _http.connect_to_host(OpenCodeServer.HOST, OpenCodeServer.port()) != OK:
-		_fail("Failed to connect to opencode server")
+func _load_baseline() -> void:
+	OpenCodeServer.get_json("/api/session/%s/message?limit=100&order=desc" % session_id, func(code: int, response: Variant) -> void:
+		if not running:
+			return
+		if code != 200 or not (response is Dictionary) or not (response.get("data") is Array):
+			_fail("Failed to load opencode session messages (HTTP %d)" % code)
+			return
+		for message in response["data"]:
+			if message is Dictionary:
+				_message_ids[str(message.get("id", ""))] = true
+		_send_prompt()
+	)
 
 
 func _send_prompt() -> void:
-	var body := {"parts": [{"type": "text", "text": _prompt}]}
+	var body := {"text": _prompt}
 	if not model.is_empty():
 		var parts := model.split("/", true, 1)
-		body["model"] = {"providerID": parts[0], "modelID": parts[1] if parts.size() > 1 else parts[0]}
-	if not variant.is_empty():
-		body["variant"] = variant
+		var ref := {"providerID": parts[0], "id": parts[1] if parts.size() > 1 else parts[0]}
+		if not variant.is_empty():
+			ref["variant"] = variant
+		OpenCodeServer.post("/api/session/%s/model" % session_id, {"model": ref}, _on_model_selected.bind(body))
+	elif not opencode_agent.is_empty():
+		_select_agent(body)
+	else:
+		_post_prompt(body)
+
+
+func _on_model_selected(code: int, _data: Variant, body: Dictionary) -> void:
+	if not running:
+		return
+	if code != 204:
+		_fail("Failed to select opencode model (HTTP %d)" % code)
+		return
 	if not opencode_agent.is_empty():
-		body["agent"] = opencode_agent
-	OpenCodeServer.post("/session/%s/prompt_async?directory=%s" % [session_id, _dir_query()], body, _on_prompt_accepted)
+		_select_agent(body)
+	else:
+		_post_prompt(body)
+
+
+func _select_agent(body: Dictionary) -> void:
+	OpenCodeServer.post("/api/session/%s/agent" % session_id, {"agent": opencode_agent}, func(code: int, _data: Variant) -> void:
+		if not running:
+			return
+		if code != 204:
+			_fail("Failed to select opencode agent (HTTP %d)" % code)
+			return
+		_post_prompt(body)
+	)
+
+
+func _post_prompt(body: Dictionary) -> void:
+	OpenCodeServer.post("/api/session/%s/prompt" % session_id, body, _on_prompt_accepted)
 
 
 func _on_prompt_accepted(code: int, _data: Variant) -> void:
 	if not running:
 		return
-	if code != 200 and code != 204:
+	if code != 200:
 		_fail("opencode rejected the prompt (HTTP %d)" % code)
+	else:
+		_prompt_submitted = true
+		_next_poll_ms = 0
 
 
-func _pump_stream() -> void:
-	if _http == null:
+func _poll_messages() -> void:
+	_poll_pending = true
+	OpenCodeServer.get_json("/api/session/%s/message?limit=100&order=desc" % session_id, _on_messages)
+
+
+func _on_messages(code: int, response: Variant) -> void:
+	_poll_pending = false
+	_next_poll_ms = Time.get_ticks_msec() + POLL_INTERVAL_MS
+	if not running:
 		return
-	_http.poll()
-	var status := _http.get_status()
-	if status == HTTPClient.STATUS_CONNECTED:
-		if not _sse_requested:
-			if _http.request(HTTPClient.METHOD_GET, "/event?directory=%s" % _dir_query(), ["Accept: text/event-stream"]) != OK:
-				_fail("Failed to subscribe to opencode events")
+	if code != 200 or not (response is Dictionary) or not (response.get("data") is Array):
+		_fail("Failed to read opencode messages (HTTP %d)" % code)
+		return
+	var messages: Array = response["data"]
+	messages.reverse()
+	for message in messages:
+		if message is Dictionary:
+			_handle_message(message)
+			if not running:
 				return
-			_sse_requested = true
+	_poll_requests()
+
+
+func _handle_message(message: Dictionary) -> void:
+	var mid := str(message.get("id", ""))
+	if _message_ids.has(mid):
 		return
-	if status == HTTPClient.STATUS_BODY:
-		if not _sse_connected:
-			_sse_connected = true
-			_send_prompt()
-		var chunks_read := 0
-		while chunks_read < MAX_SSE_CHUNKS_PER_POLL:
-			var chunk := _http.read_response_body_chunk()
-			if chunk.is_empty():
-				break
-			_sse_buffer += chunk.get_string_from_utf8()
-			chunks_read += 1
-		_consume_sse()
-		return
-	if status == HTTPClient.STATUS_DISCONNECTED and _sse_connected:
-		_finish(0 if _completed_ok and not _prompt_failed else -1)
+	match str(message.get("type", "")):
+		"assistant":
+			for i in message.get("content", []).size():
+				var part: Variant = message["content"][i]
+				if part is Dictionary:
+					_forward_content(mid, i, part, not (message.get("time", {}) as Dictionary).has("completed"))
+			if message.has("error"):
+				_prompt_failed = true
+				event_received.emit(agent_id, {"type": "error", "error": message["error"]})
+			if (message.get("time", {}) as Dictionary).has("completed"):
+				_message_ids[mid] = true
+				var finish := str(message.get("finish", ""))
+				if finish == "stop":
+					_completed_ok = true
+				event_received.emit(agent_id, {"type": "step_finish", "part": {"reason": finish, "tokens": message.get("tokens", {}), "cost": message.get("cost", 0.0)}})
+			_last_activity_ms = Time.get_ticks_msec()
+		"idle":
+			_message_ids[mid] = true
+			_finish(0 if str(message.get("outcome", "")) == "succeeded" and not _prompt_failed else -1)
+		"user":
+			_message_ids[mid] = true
 
 
-func _consume_sse() -> void:
-	_sse_buffer = _sse_buffer.replace("\r\n", "\n")
-	var events_processed := 0
-	while events_processed < MAX_SSE_EVENTS_PER_POLL:
-		var idx := _sse_buffer.find("\n\n")
-		if idx < 0:
-			break
-		var block := _sse_buffer.substr(0, idx)
-		_sse_buffer = _sse_buffer.substr(idx + 2)
-		events_processed += 1
-		var data := ""
-		for line in block.split("\n"):
-			if line.begins_with("data:"):
-				data += line.substr(5).strip_edges()
-		if data.is_empty():
-			continue
-		var parsed = JSON.parse_string(data)
-		if parsed is Dictionary:
-			_handle_sse_event(parsed)
-
-
-func _handle_sse_event(event: Dictionary) -> void:
-	var etype := str(event.get("type", ""))
-	var props: Variant = event.get("properties", {})
-	if not props is Dictionary:
-		props = {}
-	var data: Dictionary = props
-	var sid := str(data.get("sessionID", ""))
-	if sid.is_empty():
-		var part: Variant = data.get("part", {})
-		if part is Dictionary:
-			sid = str((part as Dictionary).get("sessionID", ""))
-	if not sid.is_empty() and sid != session_id:
-		return
-	_last_activity_ms = Time.get_ticks_msec()
-	match etype:
-		"message.part.updated":
-			var part: Variant = data.get("part", {})
-			if part is Dictionary:
-				_stream_parts[str(part.get("id", ""))] = part.duplicate(true)
-				_forward_part(part)
-		"message.part.delta":
-			var pid := str(data.get("partID", ""))
-			if str(data.get("field", "")) == "text" and _stream_parts.has(pid):
-				var part: Dictionary = _stream_parts[pid]
-				part["text"] = str(part.get("text", "")) + str(data.get("delta", ""))
-				_forward_part(part)
-		"permission.asked":
-			_awaiting_user = true
-			event_received.emit(agent_id, {"type": "permission_asked", "request": data})
-		"permission.replied":
-			_awaiting_user = false
-			event_received.emit(agent_id, {"type": "permission_replied", "request_id": str(data.get("requestID", ""))})
-		"question.asked":
-			_awaiting_user = true
-			event_received.emit(agent_id, {"type": "question_asked", "request": data})
-		"question.replied", "question.rejected":
-			_awaiting_user = false
-			event_received.emit(agent_id, {"type": "question_resolved", "request_id": str(data.get("requestID", ""))})
-		"session.error":
-			_prompt_failed = true
-			event_received.emit(agent_id, {"type": "error", "error": data.get("error", {})})
-		"session.status":
-			var status: Variant = data.get("status", {})
-			if _sse_connected and not _finished and status is Dictionary and str((status as Dictionary).get("type", "")) == "idle":
-				_finish(0 if _completed_ok and not _prompt_failed else -1)
-
-
-func _forward_part(part: Dictionary) -> void:
-	var ptype := str(part.get("type", ""))
-	var pid := str(part.get("id", ""))
-	match ptype:
+func _forward_content(mid: String, index: int, part: Dictionary, streaming: bool) -> void:
+	var pid := "%s:%d" % [mid, index]
+	match str(part.get("type", "")):
 		"reasoning":
 			var text := str(part.get("text", ""))
 			var previous := str(_reasoning_text.get(pid, ""))
-			if text.is_empty() or text == previous:
-				return
-			_reasoning_text[pid] = text
-			var delta := text.substr(previous.length()) if text.begins_with(previous) else text
-			var streamed := part.duplicate(true)
-			streamed["text"] = delta
-			event_received.emit(agent_id, {"type": "reasoning", "part": streamed})
+			if text != previous:
+				_last_activity_ms = Time.get_ticks_msec()
+				_reasoning_text[pid] = text
+				var delta := text.substr(previous.length()) if text.begins_with(previous) else text
+				event_received.emit(agent_id, {"type": "reasoning", "part": {"id": pid, "text": delta}})
 		"text":
-			var time: Variant = part.get("time", {})
-			if not (time is Dictionary) or int((time as Dictionary).get("end", 0)) <= 0:
-				return
-			if _seen.has(pid):
-				return
-			_seen[pid] = true
-			event_received.emit(agent_id, {"type": ptype, "part": part})
-		"step-start", "step-finish":
-			if _seen.has(pid):
-				return
-			_seen[pid] = true
-			if ptype == "step-finish" and str(part.get("reason", "")) == "stop":
-				_completed_ok = true
-			event_received.emit(agent_id, {"type": ptype.replace("-", "_"), "part": part})
+			if not streaming and not _seen.has(pid):
+				_seen[pid] = true
+				event_received.emit(agent_id, {"type": "text", "part": part})
 		"tool":
-			var state: Variant = part.get("state", {})
-			var status := ""
-			if state is Dictionary:
-				status = str((state as Dictionary).get("status", ""))
-			var key := pid + ":" + status
-			if _seen.has(key):
-				return
-			_seen[key] = true
-			event_received.emit(agent_id, {"type": "tool_use", "part": part})
+			var state: Dictionary = part.get("state", {})
+			var status := str(state.get("status", ""))
+			if not _seen.has(pid + status):
+				_last_activity_ms = Time.get_ticks_msec()
+				_seen[pid + status] = true
+				var legacy := part.duplicate(true)
+				legacy["tool"] = str(part.get("name", ""))
+				if status == "streaming":
+					state["status"] = "running"
+				event_received.emit(agent_id, {"type": "tool_use", "part": legacy})
+
+
+func _poll_requests() -> void:
+	OpenCodeServer.get_json("/api/session/%s/permission" % session_id, _on_permissions)
+	OpenCodeServer.get_json("/api/session/%s/form" % session_id, _on_forms)
+
+
+func _on_permissions(code: int, response: Variant) -> void:
+	if not running or code != 200 or not (response is Dictionary):
+		return
+	var pending := {}
+	for request in response.get("data", []):
+		if not (request is Dictionary):
+			continue
+		var id := str(request.get("id", ""))
+		pending[id] = true
+		if not _permission_ids.has(id):
+			_permission_ids[id] = true
+			_awaiting_user = true
+			var adapted: Dictionary = request.duplicate(true)
+			adapted["permission"] = str(request.get("action", ""))
+			adapted["patterns"] = request.get("resources", [])
+			adapted["always"] = request.get("save", [])
+			event_received.emit(agent_id, {"type": "permission_asked", "request": adapted})
+	for id in _permission_ids.keys():
+		if not pending.has(id):
+			_permission_ids.erase(id)
+			_awaiting_user = not _form_ids.is_empty()
+			event_received.emit(agent_id, {"type": "permission_replied", "request_id": id})
+
+
+func _on_forms(code: int, response: Variant) -> void:
+	if not running or code != 200 or not (response is Dictionary):
+		return
+	var pending := {}
+	for form in response.get("data", []):
+		if not (form is Dictionary):
+			continue
+		var id := str(form.get("id", ""))
+		pending[id] = true
+		if not _form_ids.has(id):
+			_form_ids[id] = form.get("fields", [])
+			_awaiting_user = true
+			var adapted: Dictionary = form.duplicate(true)
+			adapted["questions"] = _form_questions(form)
+			event_received.emit(agent_id, {"type": "question_asked", "request": adapted})
+	for id in _form_ids.keys():
+		if not pending.has(id):
+			_form_ids.erase(id)
+			_awaiting_user = not _permission_ids.is_empty()
+			event_received.emit(agent_id, {"type": "question_resolved", "request_id": id})
+
+
+func _form_questions(form: Dictionary) -> Array:
+	var questions := []
+	for field in form.get("fields", []):
+		if field is Dictionary:
+			var options := []
+			for option in field.get("options", []):
+				if option is Dictionary:
+					options.append({"label": option.get("label", ""), "value": option.get("value", "")})
+			questions.append({"header": field.get("title", form.get("title", "")), "question": field.get("description", ""), "options": options, "multiple": field.get("type", "") == "multiselect", "custom": field.get("custom", false) or options.is_empty()})
+	return questions
 
 
 func _finish(code: int) -> void:
@@ -311,9 +376,6 @@ func _finish(code: int) -> void:
 		return
 	_finished = true
 	running = false
-	if _http != null:
-		_http.close()
-		_http = null
 	process_finished.emit(agent_id, code)
 
 
@@ -326,11 +388,7 @@ func _fail(message: String) -> void:
 func _abort() -> void:
 	if session_id.is_empty() or not OpenCodeServer.is_ready():
 		return
-	OpenCodeServer.post("/session/%s/abort?directory=%s" % [session_id, _dir_query()], {})
-
-
-func _dir_query() -> String:
-	return project.uri_encode()
+	OpenCodeServer.post("/api/session/%s/interrupt" % session_id, {})
 
 
 func _expand_home(path: String) -> String:

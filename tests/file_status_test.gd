@@ -45,10 +45,13 @@ func _ready() -> void:
 	_emit_tool("write", {"filePath": "write-existing.gd"}, "completed", {"exists": true})
 	_emit_tool("multi_edit", {"filePath": "multi.gd", "edits": [{"oldString": "a", "newString": "b"}]})
 	_emit_tool("patch", {"edits": [{"filePath": "legacy.gd"}]})
+	_emit_tool("write", '{"filePath":"string-input.gd"}', "completed", {"exists": false})
+	_emit_tool("bash", "not JSON", "completed")
 	_expect("write-new.gd", "C")
 	_expect("write-existing.gd", "M")
 	_expect("multi.gd", "M")
 	_expect("legacy.gd", "M")
+	_expect("string-input.gd", "C")
 	_emit_tool("apply_patch", {"patchText": "*** Begin Patch\n*** Delete File: created.gd\n*** End Patch"})
 	_expect("created.gd", "D")
 	_emit_tool("apply_patch", {"patchText": "*** Begin Patch\n*** Add File: created.gd\n+restored\n*** End Patch"})
@@ -59,14 +62,12 @@ func _ready() -> void:
 	get_tree().quit(0 if _ok else 1)
 
 
-func _emit_tool(tool: String, input: Dictionary, status: String = "completed", metadata: Dictionary = {}) -> void:
+func _emit_tool(tool: String, input: Variant, status: String = "completed", metadata: Dictionary = {}) -> void:
 	_part_id += 1
-	_runner._handle_sse_event({"type": "message.part.updated", "properties": {
-		"sessionID": "ses_files", "part": {
-			"id": "file_part_%d" % _part_id, "sessionID": "ses_files", "type": "tool", "tool": tool,
-			"state": {"status": status, "input": input, "metadata": metadata},
-		},
-	}})
+	_runner._forward_content("msg_files", _part_id, {
+		"id": "file_part_%d" % _part_id, "type": "tool", "name": tool,
+		"state": {"status": status, "input": input, "metadata": metadata},
+	}, false)
 
 
 func _expect(path: String, expected: String) -> void:

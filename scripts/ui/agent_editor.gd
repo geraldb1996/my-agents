@@ -122,9 +122,9 @@ func _on_opencode_agents_loaded(code: int, data: Variant, request_id: int) -> vo
 	opencode_agent_select.add_item("Default (auto)")
 	opencode_agent_select.set_item_metadata(0, "")
 	var names: Array[String] = []
-	var loaded := code == 200 and data is Array
+	var loaded := code == 200 and data is Dictionary and data.get("data") is Array
 	if loaded:
-		for entry in data:
+		for entry in data["data"]:
 			if entry is Dictionary:
 				var agent_name := str(entry.get("name", "")).strip_edges()
 				if not agent_name.is_empty() and not names.has(agent_name):

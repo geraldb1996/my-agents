@@ -13,9 +13,10 @@ func _ready() -> void:
 	runner.agent_id = "output_test"
 	runner.session_id = "ses_output"
 	runner.event_received.connect(AgentManager._handle_event)
-	runner._handle_sse_event({"type": "message.part.updated", "properties": {"part": {"id": "reason", "sessionID": "ses_output", "type": "reasoning", "text": ""}}})
+	var text := ""
 	for delta in ["Visible ", "[b]literal[/b]\n", "long output line\n".repeat(200)]:
-		runner._handle_sse_event({"type": "message.part.delta", "properties": {"sessionID": "ses_output", "partID": "reason", "field": "text", "delta": delta}})
+		text += delta
+		runner._forward_content("msg_output", 0, {"type": "reasoning", "text": text}, true)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var history := AgentManager.get_output_history("output_test")
@@ -30,7 +31,7 @@ func _ready() -> void:
 	ok = ok and panel.output_dialog.visible and panel.expanded_output_log.text == panel.output_log.text
 	print("[OUTPUTTEST] popup=", ok)
 	bar.value = 0
-	runner._handle_sse_event({"type": "message.part.delta", "properties": {"sessionID": "ses_output", "partID": "reason", "field": "text", "delta": "live popup"}})
+	runner._forward_content("msg_output", 0, {"type": "reasoning", "text": text + "live popup"}, true)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	ok = ok and bar.value == 0 and panel.expanded_output_log.text.ends_with("live popup\n")

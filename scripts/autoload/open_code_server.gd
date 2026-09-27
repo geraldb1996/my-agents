@@ -11,6 +11,8 @@ var _port: int = 0
 var _starting: bool = false
 var _server_ready: bool = false
 var _server_version: String = ""
+var _server_password: String = ""
+var _startup_error: String = ""
 var _model_catalog_changed: bool = false
 var _started_at_ms: int = 0
 var _probe_at_ms: int = 0
@@ -57,6 +59,14 @@ func base_url() -> String:
 
 func is_ready() -> bool:
 	return _server_ready and _pid > 0 and OS.is_process_running(_pid)
+
+
+func startup_error() -> String:
+	return _startup_error
+
+
+func _auth_headers() -> PackedStringArray:
+	return PackedStringArray(["Authorization: Basic " + Marshalls.utf8_to_base64("opencode:" + _server_password)])
 
 
 func ensure_ready(callback: Callable, starting_agent_id: String = "") -> void:
@@ -132,7 +142,38 @@ func post(path: String, body: Dictionary, callback: Callable = Callable()) -> vo
 		if callback.is_valid():
 			callback.call(code, parsed)
 	)
-	if request.request(base_url() + path, ["Content-Type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(body)) != OK:
+	var headers := _auth_headers()
+	headers.append("Content-Type: application/json")
+	if request.request(base_url() + path, headers, HTTPClient.METHOD_POST, JSON.stringify(body)) != OK:
+		request.queue_free()
+		if callback.is_valid():
+			callback.call(0, null)
+
+
+func get_json(path: String, callback: Callable) -> void:
+	var request := HTTPRequest.new()
+	request.timeout = 20.0
+	add_child(request)
+	request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, data: PackedByteArray) -> void:
+		request.queue_free()
+		if callback.is_valid():
+			callback.call(code, JSON.parse_string(data.get_string_from_utf8()))
+	)
+	if request.request(base_url() + path, _auth_headers()) != OK:
+		request.queue_free()
+		if callback.is_valid():
+			callback.call(0, null)
+
+
+func delete_json(path: String, callback: Callable) -> void:
+	var request := HTTPRequest.new()
+	add_child(request)
+	request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, _data: PackedByteArray) -> void:
+		request.queue_free()
+		if callback.is_valid():
+			callback.call(code, null)
+	)
+	if request.request(base_url() + path, _auth_headers(), HTTPClient.METHOD_DELETE) != OK:
 		request.queue_free()
 		if callback.is_valid():
 			callback.call(0, null)
@@ -145,24 +186,13 @@ func get_agents(directory: String, callback: Callable) -> void:
 		if not ready:
 			callback.call(0, null)
 			return
-		var request := HTTPRequest.new()
-		request.timeout = 20.0
-		add_child(request)
-		request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, data: PackedByteArray) -> void:
-			request.queue_free()
-			if callback.is_valid():
-				callback.call(code, JSON.parse_string(data.get_string_from_utf8()))
-		)
-		var path := "/agent"
+		var path := "/api/agent"
 		var expanded := directory
 		if expanded.begins_with("~"):
 			expanded = OS.get_environment("HOME").path_join(expanded.substr(1).trim_prefix("/"))
 		if not expanded.is_empty():
-			path += "?directory=" + expanded.uri_encode()
-		if request.request(base_url() + path) != OK:
-			request.queue_free()
-			if callback.is_valid():
-				callback.call(0, null)
+			path += "?location[directory]=" + expanded.uri_encode()
+		get_json(path, callback)
 	)
 
 
@@ -178,6 +208,7 @@ func _stop_server() -> void:
 	_server_ready = false
 	_server_version = ""
 	_starting = false
+	_server_password = ""
 	if FileAccess.file_exists(PID_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(PID_PATH))
 
@@ -186,9 +217,15 @@ func _start_server() -> void:
 	_starting = true
 	_server_ready = false
 	_server_version = ""
+	_startup_error = ""
 	_port = _find_free_port()
+	_server_password = Crypto.new().generate_random_bytes(32).hex_encode()
+	var previous_password := OS.get_environment("OPENCODE_SERVER_PASSWORD")
+	OS.set_environment("OPENCODE_SERVER_PASSWORD", _server_password)
 	_pid = OS.create_process("opencode", ["serve", "--hostname", HOST, "--port", str(_port)], false)
+	OS.set_environment("OPENCODE_SERVER_PASSWORD", previous_password)
 	if _pid <= 0:
+		_startup_error = "Could not launch opencode. Check the app's PATH and installation."
 		_fail_callbacks()
 		return
 	_write_pid_file()
@@ -197,6 +234,8 @@ func _start_server() -> void:
 
 
 func _fail_callbacks() -> void:
+	if _startup_error.is_empty():
+		_startup_error = "OpenCode did not become ready. Check the OpenCode server log."
 	_pid = -1
 	_server_ready = false
 	_starting = false
@@ -211,13 +250,15 @@ func _probe() -> void:
 	add_child(request)
 	request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 		request.queue_free()
+		if code == 401:
+			_startup_error = "OpenCode server rejected authentication (HTTP 401)."
 		if code == 200 and not _server_ready:
 			var health: Variant = JSON.parse_string(body.get_string_from_utf8())
 			if health is Dictionary:
 				_server_version = str((health as Dictionary).get("version", ""))
 			_mark_ready()
 	)
-	if request.request(base_url() + "/global/health") != OK:
+	if request.request(base_url() + "/api/info", _auth_headers()) != OK:
 		request.queue_free()
 
 

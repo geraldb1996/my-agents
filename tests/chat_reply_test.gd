@@ -62,32 +62,32 @@ func _test_live_messages() -> bool:
 	runner.agent_id = profile.id
 	runner.session_id = "ses_chat_test"
 	runner.running = true
-	runner._sse_connected = true
 	runner.event_received.connect(AgentManager._handle_event)
 	runner.process_finished.connect(AgentManager._on_process_finished)
-	var first := {"id": "text_1", "messageID": "same_message", "sessionID": runner.session_id, "type": "text", "text": "Agregaré doble clic"}
-	_send_part(runner, first)
+	var first := {"id": "msg_first", "time": {"created": 1}, "type": "assistant", "content": [{"type": "text", "text": "Agregaré doble clic"}]}
+	runner._handle_message(first)
 	var ok := _messages.is_empty()
-	first["time"] = {"end": 1}
-	_send_part(runner, first)
+	first["time"] = {"created": 1, "completed": 2}
+	first["finish"] = "tool-calls"
+	runner._handle_message(first)
 	ok = ok and _messages == ["Agregaré doble clic"] and runner.running
 	ok = ok and AgentManager.get_session(profile.id)["task"] == "test"
 	ProfileStore.load_chat_history()
 	ok = ok and ProfileStore.chat_history.size() == saved_history.size() + 1
-	_send_part(runner, first)
-	_send_part(runner, {"id": "reason_1", "sessionID": runner.session_id, "type": "reasoning", "text": "pensamiento interno"})
+	runner._handle_message(first)
+	runner._handle_message({"id": "msg_reason", "time": {"created": 3}, "type": "assistant", "content": [{"type": "reasoning", "text": "pensamiento interno"}]})
 	ok = ok and _messages.size() == 1 and AgentManager.get_output_history(profile.id).has("[think] pensamiento interno")
-	var second := {"id": "text_2", "messageID": "same_message", "sessionID": runner.session_id, "type": "text", "text": "CHAT"}
-	_send_part(runner, second)
-	runner._handle_sse_event({"type": "message.part.delta", "properties": {"sessionID": runner.session_id, "partID": "text_2", "field": "text", "delta": ": Cambio listo"}})
+	var second := {"id": "msg_second", "time": {"created": 4}, "type": "assistant", "content": [{"type": "text", "text": "CHAT"}]}
+	runner._handle_message(second)
+	second["content"] = [{"type": "text", "text": "CHAT: Cambio listo"}]
+	runner._handle_message(second)
 	ok = ok and _messages.size() == 1
-	second["text"] = "CHAT: Cambio listo"
-	second["time"] = {"end": 2}
-	_send_part(runner, second)
-	_send_part(runner, second)
+	second["time"] = {"created": 4, "completed": 5}
+	second["finish"] = "stop"
+	runner._handle_message(second)
+	runner._handle_message(second)
 	ok = ok and _messages == ["Agregaré doble clic", "Cambio listo"] and runner.running
-	_send_part(runner, {"id": "finish", "sessionID": runner.session_id, "type": "step-finish", "reason": "stop"})
-	runner._handle_sse_event({"type": "session.status", "properties": {"sessionID": runner.session_id, "status": {"type": "idle"}}})
+	runner._handle_message({"id": "msg_idle", "type": "idle", "outcome": "succeeded"})
 	ok = ok and _messages == ["Agregaré doble clic", "Cambio listo"] and not runner.running
 	ProfileStore.load_chat_history()
 	ok = ok and ProfileStore.chat_history.size() == saved_history.size() + 2
@@ -102,10 +102,6 @@ func _test_live_messages() -> bool:
 	runner.queue_free()
 	print("[CHATTEST] immediate/separate/deduplicated/persisted=", ok)
 	return ok
-
-
-func _send_part(runner: OpenCodeRunner, part: Dictionary) -> void:
-	runner._handle_sse_event({"type": "message.part.updated", "properties": {"part": part}})
 
 
 func _test_task_senders() -> bool:

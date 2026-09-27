@@ -1008,9 +1008,11 @@ func _handle_tool(agent_id: String, part: Dictionary) -> void:
 		tool_state = {}
 	var status: String = str(tool_state.get("status", ""))
 	var title: String = str(tool_state.get("title", ""))
-	var tool_input: Dictionary = tool_state.get("input", {})
-	if tool_input is not Dictionary:
-		tool_input = {}
+	var raw_input: Variant = tool_state.get("input", {})
+	if raw_input is String:
+		var json := JSON.new()
+		raw_input = json.data if json.parse(raw_input) == OK else {}
+	var tool_input: Dictionary = raw_input if raw_input is Dictionary else {}
 
 	var base_state: String = TOOL_STATES.get(tool_name, "working")
 	var note := title

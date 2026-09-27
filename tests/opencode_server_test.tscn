@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/opencode_server_test.gd" id="1_servertest"]
+
+[node name="OpenCodeServerTest" type="Node"]
+script = ExtResource("1_servertest")
