@@ -9,6 +9,7 @@ const DEFAULT_AGENTS_DIR := "res://agents/default"
 var profiles: Dictionary = {}
 var chat_history: Array = []
 var project_colors: Dictionary = {}
+var _chat_write_pending: bool = false
 
 
 func _ready() -> void:
@@ -18,6 +19,10 @@ func _ready() -> void:
 	_seed_default_profiles()
 	load_chat_history()
 	load_project_colors()
+
+
+func _exit_tree() -> void:
+	flush_chat_history()
 
 
 func _ensure_dirs() -> void:
@@ -47,9 +52,15 @@ func load_profiles() -> void:
 func _seed_default_profiles() -> void:
 	if not profiles.is_empty():
 		return
+	for profile in _default_agent_profiles():
+		save_profile(profile)
+
+
+func _default_agent_profiles() -> Array[AgentProfile]:
+	var defaults: Array[AgentProfile] = []
 	var dir := DirAccess.open(DEFAULT_AGENTS_DIR)
 	if dir == null:
-		return
+		return defaults
 	for file_name in dir.get_files():
 		if not file_name.ends_with(".json"):
 			continue
@@ -58,7 +69,20 @@ func _seed_default_profiles() -> void:
 			continue
 		var parsed = JSON.parse_string(text)
 		if parsed is Dictionary:
-			save_profile(AgentProfile.from_dict(parsed))
+			defaults.append(AgentProfile.from_dict(parsed))
+	return defaults
+
+
+func restore_default_agents() -> Array[String]:
+	var restored: Array[String] = []
+	for profile in _default_agent_profiles():
+		profile.ensure_id()
+		if profiles.has(profile.id):
+			continue
+		save_profile(profile)
+		restored.append(profile.id)
+		EventBus.profile_saved.emit(profile)
+	return restored
 
 
 func save_profile(profile: AgentProfile) -> void:
@@ -109,6 +133,7 @@ func extract_mentions(text: String) -> Array:
 
 
 func load_chat_history() -> void:
+	flush_chat_history()
 	var text := _read_text(CHAT_PATH)
 	if text.is_empty():
 		chat_history = []
@@ -137,13 +162,32 @@ func append_chat_message(sender: String, content: String, mentions: Array, times
 		"session_id": session_id,
 	}
 	chat_history.append(message)
-	_write_chat_history()
+	_schedule_chat_write()
 	return message
 
 
 func clear_chat_history() -> void:
 	chat_history.clear()
+	_schedule_chat_write()
+
+
+func _schedule_chat_write() -> void:
+	if _chat_write_pending:
+		return
+	_chat_write_pending = true
+	_flush_chat_history_deferred.call_deferred()
+
+
+func _flush_chat_history_deferred() -> void:
+	if not _chat_write_pending:
+		return
+	_chat_write_pending = false
 	_write_chat_history()
+
+
+func flush_chat_history() -> void:
+	if _chat_write_pending:
+		_flush_chat_history_deferred()
 
 
 func get_chat_messages(after_id: String = "", limit: int = 100) -> Dictionary:

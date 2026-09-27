@@ -78,5 +78,24 @@ func _ready() -> void:
 	if ProfileStore.profiles.size() != 3:
 		ok = false
 		print("[SEEDTEST] duplicated on re-seed, size=", ProfileStore.profiles.size())
+	var custom := AgentProfile.new()
+	custom.id = "ag_restore_custom"
+	custom.name = "Restore Custom"
+	ProfileStore.save_profile(custom)
+	ProfileStore.delete_profile("ag_default_elliot")
+	var restored := ProfileStore.restore_default_agents()
+	if restored.size() != 1 or restored[0] != "ag_default_elliot":
+		ok = false
+		print("[SEEDTEST] restore did not report Elliot: ", restored)
+	if ProfileStore.get_profile("ag_default_elliot") == null:
+		ok = false
+		print("[SEEDTEST] restore did not re-add Elliot")
+	if ProfileStore.get_profile("ag_restore_custom") == null:
+		ok = false
+		print("[SEEDTEST] restore removed a custom agent")
+	if not ProfileStore.restore_default_agents().is_empty():
+		ok = false
+		print("[SEEDTEST] restore duplicated existing default agents")
+	ProfileStore.delete_profile("ag_restore_custom")
 	print("[SEEDTEST] RESULT=", "PASS" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)

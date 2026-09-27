@@ -218,8 +218,68 @@ msgstr "Rama: %s"
 msgid "Not a git repo"
 msgstr "No es un repositorio Git"
 
+msgid "Branches"
+msgstr "Ramas"
+
+msgid "Current branch"
+msgstr "Rama actual"
+
+msgid "Switch to this branch"
+msgstr "Cambiar a esta rama"
+
+msgid "switch to branch"
+msgstr "cambiar a rama"
+
+msgid "New Branch"
+msgstr "Nueva rama"
+
+msgid "Branch name"
+msgstr "Nombre de rama"
+
+msgid "Enter a branch name"
+msgstr "Escribe un nombre de rama"
+
+msgid "Create Branch"
+msgstr "Crear rama"
+
+msgid "create branch"
+msgstr "crear rama"
+
+msgid "unknown error"
+msgstr "error desconocido"
+
 msgid "Select Project Folder"
 msgstr "Seleccionar carpeta del proyecto"
+
+msgid "Choose Project"
+msgstr "Elegir proyecto"
+
+msgid "Choose a project"
+msgstr "Elige un proyecto"
+
+msgid "Select a saved folder, remove it from this list, or search for a new project."
+msgstr "Selecciona una carpeta guardada, elimínala de la lista o busca un proyecto nuevo."
+
+msgid "No saved projects yet"
+msgstr "Aún no hay proyectos guardados"
+
+msgid "Remove"
+msgstr "Quitar"
+
+msgid "Remove saved project"
+msgstr "Quitar proyecto guardado"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Search for new project..."
+msgstr "Buscar proyecto nuevo..."
+
+msgid "Copy Access Link"
+msgstr "Copiar enlace de acceso"
+
+msgid "Remote Chat access link copied."
+msgstr "Enlace de acceso a Remote Chat copiado."
 
 msgid "TEAM CHAT"
 msgstr "CHAT DE EQUIPO"
@@ -523,3 +583,42 @@ msgstr "No se pudo generar el QR. Instala qrencode localmente y vuelve a intenta
 
 msgid "QR opened locally. It contains the access URL and token only."
 msgstr "QR abierto localmente. Solo contiene la URL de acceso y el token."
+
+msgid "Defaults"
+msgstr "Predeterminados"
+
+msgid "Restore the default agents (Amy, Lucy, Elliot) if they were deleted. Your own agents, chat and sessions are kept."
+msgstr "Restaura los agentes predeterminados (Amy, Lucy, Elliot) si se borraron. Tus propios agentes, el chat y las sesiones se conservan."
+
+msgid "Restore default agents"
+msgstr "Restaurar agentes predeterminados"
+
+msgid "Restore the default agents (Amy, Lucy, Elliot) that are missing? Your own agents, chat and sessions are kept."
+msgstr "¿Restaurar los agentes predeterminados (Amy, Lucy, Elliot) que faltan? Tus propios agentes, el chat y las sesiones se conservan."
+
+msgid "Restore"
+msgstr "Restaurar"
+
+msgid "All default agents are already present."
+msgstr "Todos los agentes predeterminados ya están presentes."
+
+msgid "Restored %d default agent(s)."
+msgstr "Se restauraron %d agentes predeterminados."
+
+msgid "Update available"
+msgstr "Actualización disponible"
+
+msgid "New version %s → %s"
+msgstr "Nueva versión %s → %s"
+
+msgid "Update"
+msgstr "Actualizar"
+
+msgid "Update error"
+msgstr "Error de actualización"
+
+msgid "GGUpdater was not found in: %s"
+msgstr "No se encontró GGUpdater en: %s"
+
+msgid "Could not start GGUpdater."
+msgstr "No se pudo iniciar GGUpdater."

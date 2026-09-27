@@ -33,6 +33,11 @@ layout_mode = 2
 theme_type_variation = &"MutedLabel"
 text = "No agent selected"
 
+[node name="ManageSessionsButton" type="Button" parent="Root/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Manage Sessions"
+
 [node name="TaskRow" type="HBoxContainer" parent="Root"]
 layout_mode = 2
 
@@ -167,7 +172,11 @@ text = "--"
 layout_mode = 2
 vertical_scroll_mode = 2
 
-[node name="GitLabel" type="Label" parent="Root/InfoTabs/Git"]
+[node name="GitContent" type="VBoxContainer" parent="Root/InfoTabs/Git"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GitLabel" type="Label" parent="Root/InfoTabs/Git/GitContent"]
 unique_name_in_owner = true
 auto_translate_mode = 2
 layout_mode = 2
@@ -176,6 +185,23 @@ size_flags_vertical = 1
 theme_type_variation = &"MutedLabel"
 autowrap_mode = 2
 text = "--"
+
+[node name="BranchesLabel" type="Label" parent="Root/InfoTabs/Git/GitContent"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Branches"
+
+[node name="GitBranches" type="HFlowContainer" parent="Root/InfoTabs/Git/GitContent"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="NewBranchButton" type="Button" parent="Root/InfoTabs/Git/GitContent"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+New"
 
 [node name="Output" type="VBoxContainer" parent="Root/InfoTabs"]
 layout_mode = 2
@@ -218,6 +244,69 @@ visible = false
 transient = true
 exclusive = true
 
+[node name="SessionManagerDialog" type="Window" parent="."]
+unique_name_in_owner = true
+title = "Manage Sessions"
+size = Vector2i(960, 620)
+min_size = Vector2i(600, 360)
+visible = false
+transient = true
+exclusive = true
+
+[node name="Root" type="VBoxContainer" parent="SessionManagerDialog"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Columns" type="HBoxContainer" parent="SessionManagerDialog/Root"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Agent" type="Label" parent="SessionManagerDialog/Root/Columns"]
+layout_mode = 2
+custom_minimum_size = Vector2(105, 0)
+text = "Agent"
+
+[node name="Session" type="Label" parent="SessionManagerDialog/Root/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Session name"
+
+[node name="Context" type="Label" parent="SessionManagerDialog/Root/Columns"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = "Context"
+
+[node name="Percent" type="Label" parent="SessionManagerDialog/Root/Columns"]
+layout_mode = 2
+custom_minimum_size = Vector2(55, 0)
+text = "%"
+
+[node name="Actions" type="Label" parent="SessionManagerDialog/Root/Columns"]
+layout_mode = 2
+custom_minimum_size = Vector2(70, 0)
+
+[node name="SessionScroll" type="ScrollContainer" parent="SessionManagerDialog/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SessionList" type="VBoxContainer" parent="SessionManagerDialog/Root/SessionScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseSessionManagerButton" type="Button" parent="SessionManagerDialog/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Close"
+
 [node name="ExpandedOutputLog" type="RichTextLabel" parent="OutputDialog"]
 unique_name_in_owner = true
 auto_translate_mode = 2
@@ -238,6 +327,118 @@ unique_name_in_owner = true
 file_mode = 2
 access = 2
 title = "Select Project Folder"
+
+[node name="ProjectPickerDialog" type="Window" parent="."]
+unique_name_in_owner = true
+title = "Choose Project"
+size = Vector2i(620, 440)
+min_size = Vector2i(420, 280)
+visible = false
+transient = true
+exclusive = true
+
+[node name="Margin" type="MarginContainer" parent="ProjectPickerDialog"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 14.0
+offset_right = -14.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="ProjectPickerDialog/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="ProjectPickerDialog/Margin/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Choose a project"
+
+[node name="Hint" type="Label" parent="ProjectPickerDialog/Margin/Content"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+autowrap_mode = 2
+text = "Select a saved folder, remove it from this list, or search for a new project."
+
+[node name="ProjectScroll" type="ScrollContainer" parent="ProjectPickerDialog/Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ProjectFolderList" type="VBoxContainer" parent="ProjectPickerDialog/Margin/Content/ProjectScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="Actions" type="HBoxContainer" parent="ProjectPickerDialog/Margin/Content"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="CloseProjectPickerButton" type="Button" parent="ProjectPickerDialog/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Close"
+
+[node name="BrowseProjectButton" type="Button" parent="ProjectPickerDialog/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Search for new project..."
+
+[node name="NewBranchDialog" type="Window" parent="."]
+unique_name_in_owner = true
+title = "New Branch"
+size = Vector2i(420, 180)
+min_size = Vector2i(320, 150)
+visible = false
+transient = true
+exclusive = true
+
+[node name="Margin" type="MarginContainer" parent="NewBranchDialog"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 14.0
+offset_right = -14.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="NewBranchDialog/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NewBranchEdit" type="LineEdit" parent="NewBranchDialog/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Branch name"
+
+[node name="NewBranchError" type="Label" parent="NewBranchDialog/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(1, 0.45, 0.45, 1)
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="NewBranchDialog/Margin/Content"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="CancelNewBranchButton" type="Button" parent="NewBranchDialog/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"
+
+[node name="CreateBranchButton" type="Button" parent="NewBranchDialog/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Create Branch"
 
 [node name="TempSkillDialog" parent="." instance=ExtResource("3_tsd")]
 unique_name_in_owner = true

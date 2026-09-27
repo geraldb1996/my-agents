@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cn1mkwnr8t2gq"]
 
 [ext_resource type="Script" uid="uid://bxtq70oyut3dv" path="res://scripts/ui/chat_panel.gd" id="1_chat"]
-[ext_resource type="AudioStreamWAV" uid="uid://00jny4c3h66i" path="res://ui_snd/msg.wav" id="2_snd"]
+[ext_resource type="AudioStream" uid="uid://00jny4c3h66i" path="res://ui_snd/msg.wav" id="2_snd"]
 
 [node name="ChatPanel" type="PanelContainer" unique_id=482658913]
 custom_minimum_size = Vector2(340, 0)
@@ -58,8 +58,8 @@ size_flags_horizontal = 3
 [node name="TypingLabel" type="Label" parent="Root" unique_id=1673171444]
 unique_name_in_owner = true
 visible = false
-theme_type_variation = &"MutedLabel"
 layout_mode = 2
+theme_type_variation = &"MutedLabel"
 
 [node name="InputRow" type="HBoxContainer" parent="Root" unique_id=1158968561]
 layout_mode = 2
@@ -70,17 +70,35 @@ layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Message... use @Agent or @all"
 
+[node name="AttachButton" type="Button" parent="Root/InputRow" unique_id=1813511666]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Attach file"
+text = "Attach"
+
 [node name="SendButton" type="Button" parent="Root/InputRow" unique_id=1419655009]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Send"
+
+[node name="AttachmentStatus" type="Label" parent="Root" unique_id=-1458877979]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+
+[node name="AttachmentDialog" type="FileDialog" parent="." unique_id=826205810]
+unique_name_in_owner = true
+title = "Open a File"
+file_mode = 0
+access = 2
 
 [node name="ClearDialog" type="ConfirmationDialog" parent="." unique_id=1963547024]
 unique_name_in_owner = true
 title = "Clear chat history"
 dialog_text = "Delete all chat messages? This cannot be undone."
 
-[node name="MsgSound" type="AudioStreamPlayer" parent="."]
+[node name="MsgSound" type="AudioStreamPlayer" parent="." unique_id=506374430]
 unique_name_in_owner = true
 stream = ExtResource("2_snd")
 volume_db = -6.0

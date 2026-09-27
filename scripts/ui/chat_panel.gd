@@ -32,6 +32,11 @@ var _message_dialog: AcceptDialog
 var _message_body: RichTextLabel
 var _message_avatar: CharacterAvatar
 var _dialog_agent_id := ""
+var _visible_messages: Array[Dictionary] = []
+var _dialog_message_index := -1
+var _previous_message_button: Button
+var _next_message_button: Button
+var _autoscroll_pending := false
 
 
 func _ready() -> void:
@@ -39,6 +44,8 @@ func _ready() -> void:
 	SystemSettings.settings_changed.connect(_on_settings_changed)
 	ThemeManager.theme_changed.connect(_on_theme_changed)
 	%SendButton.pressed.connect(_on_send_pressed)
+	%AttachButton.pressed.connect(_on_attach_pressed)
+	%AttachmentDialog.file_selected.connect(_on_attachment_selected)
 	%ClearButton.pressed.connect(_on_clear_pressed)
 	%ClearDialog.confirmed.connect(_on_clear_confirmed)
 	%AgentFilter.item_selected.connect(_on_filter_selected)
@@ -93,11 +100,16 @@ func _on_clear_pressed() -> void:
 
 func _on_clear_confirmed() -> void:
 	ProfileStore.clear_chat_history()
+	_visible_messages.clear()
+	_dialog_message_index = -1
+	if _message_dialog != null:
+		_message_dialog.hide()
 	for child in messages_box.get_children():
 		child.queue_free()
 
 
 func _populate_history() -> void:
+	_visible_messages.clear()
 	for child in messages_box.get_children():
 		child.queue_free()
 	for msg in ProfileStore.chat_history:
@@ -107,7 +119,8 @@ func _populate_history() -> void:
 			var timestamp := int(msg.get("timestamp", 0))
 			var is_agent := bool(msg.get("is_agent", false))
 			if _passes_filter(sender, is_agent):
-				_add_bubble(sender, content, timestamp, is_agent)
+				_visible_messages.append(msg)
+				_add_bubble(sender, content, timestamp, is_agent, _visible_messages.size() - 1)
 	_autoscroll()
 
 
@@ -115,11 +128,19 @@ func _on_chat_message(sender: String, content: String, _mentions: Array, timesta
 	_play_msg_sound()
 	if not _passes_filter(sender, is_agent):
 		return
-	_add_bubble(sender, content, timestamp, is_agent)
+	_visible_messages.append({
+		"sender": sender,
+		"content": content,
+		"timestamp": timestamp,
+		"is_agent": is_agent,
+	})
+	_add_bubble(sender, content, timestamp, is_agent, _visible_messages.size() - 1)
+	if _message_dialog != null and _message_dialog.visible:
+		_update_message_navigation()
 	_autoscroll()
 
 
-func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool) -> void:
+func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool, message_index: int) -> void:
 	var is_user := sender == "user"
 	var is_system := sender == "system"
 	var agent_id := _find_agent_id_by_name(sender) if is_agent else ""
@@ -184,7 +205,7 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	bubble.add_child(inner)
 	row.add_child(bubble)
 	bubble.tooltip_text = "Double-click to enlarge message"
-	bubble.gui_input.connect(_on_bubble_gui_input.bind(content, sender_label.text, timestamp, agent_id))
+	bubble.gui_input.connect(_on_bubble_gui_input.bind(message_index))
 
 	if not is_user:
 		var spacer_right := Control.new()
@@ -194,24 +215,38 @@ func _add_bubble(sender: String, content: String, timestamp: int, is_agent: bool
 	messages_box.add_child(row)
 
 
-func _on_bubble_gui_input(event: InputEvent, content: String, sender: String, timestamp: int, agent_id: String) -> void:
+func _on_bubble_gui_input(event: InputEvent, message_index: int) -> void:
 	if not event is InputEventMouseButton or not event.pressed:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 		accept_event()
-		_show_message_dialog(content, sender, timestamp, agent_id)
+		_show_message_dialog(message_index)
 	elif event.button_index == MOUSE_BUTTON_RIGHT:
-		_copy_content = content
+		if message_index < 0 or message_index >= _visible_messages.size():
+			return
+		var message := _visible_messages[message_index]
+		var sender := str(message.get("sender", "?"))
+		var agent_id := _find_agent_id_by_name(sender) if bool(message.get("is_agent", false)) else ""
+		_copy_content = str(message.get("content", ""))
 		_show_copy_menu(sender, agent_id)
 
 
-func _show_message_dialog(content: String, sender: String, timestamp: int, agent_id: String) -> void:
+func _show_message_dialog(message_index: int) -> void:
+	if message_index < 0 or message_index >= _visible_messages.size():
+		return
 	if _message_dialog == null:
 		_message_dialog = AcceptDialog.new()
 		_message_dialog.name = "MessageDialog"
 		_message_dialog.exclusive = true
 		_message_dialog.min_size = Vector2i(320, 240)
 		_message_dialog.ok_button_text = "Close"
+		_previous_message_button = _message_dialog.add_button("Previous", false, "previous")
+		_next_message_button = _message_dialog.add_button("Next", false, "next")
+		var button_bar := _message_dialog.get_ok_button().get_parent()
+		button_bar.move_child(_previous_message_button, 0)
+		button_bar.move_child(_message_dialog.get_ok_button(), 1)
+		button_bar.move_child(_next_message_button, 2)
+		_message_dialog.custom_action.connect(_on_message_dialog_action)
 		var layout := VBoxContainer.new()
 		_message_avatar = CharacterAvatar.new()
 		_message_avatar.custom_minimum_size = Vector2(160, 160)
@@ -228,13 +263,37 @@ func _show_message_dialog(content: String, sender: String, timestamp: int, agent
 		_message_dialog.add_child(layout)
 		add_child(_message_dialog)
 		_apply_dialog_style()
-	_dialog_agent_id = agent_id
-	_message_dialog.title = tr("Team Chat — %s %s") % [sender, _format_time(timestamp)]
-	_message_body.text = content
-	_sync_dialog_avatar()
+	_dialog_message_index = message_index
+	_show_selected_message()
 	_message_dialog.popup_centered_clamped(Vector2i(800, 600), 0.9)
 	_message_body.scroll_to_line(0)
 	_message_body.grab_focus()
+
+
+func _show_selected_message() -> void:
+	var message := _visible_messages[_dialog_message_index]
+	var sender := str(message.get("sender", "?"))
+	var timestamp := int(message.get("timestamp", 0))
+	_dialog_agent_id = _find_agent_id_by_name(sender) if bool(message.get("is_agent", false)) else ""
+	_message_dialog.title = tr("Team Chat — %s %s") % [sender, _format_time(timestamp)]
+	_message_body.text = str(message.get("content", ""))
+	_sync_dialog_avatar()
+	_update_message_navigation()
+
+
+func _update_message_navigation() -> void:
+	_previous_message_button.disabled = _dialog_message_index == 0
+	_next_message_button.disabled = _dialog_message_index == _visible_messages.size() - 1
+
+
+func _on_message_dialog_action(action: StringName) -> void:
+	if action == &"previous" and _dialog_message_index > 0:
+		_dialog_message_index -= 1
+	elif action == &"next" and _dialog_message_index < _visible_messages.size() - 1:
+		_dialog_message_index += 1
+	else:
+		return
+	_show_selected_message()
 
 
 func _sync_dialog_avatar() -> void:
@@ -378,6 +437,33 @@ func _on_send_pressed() -> void:
 	var result := AgentManager.send_user_message(input_edit.text)
 	if bool(result.get("accepted", false)):
 		input_edit.clear()
+		_set_attachment_status("")
+
+
+func _on_attach_pressed() -> void:
+	%AttachmentDialog.popup_centered_ratio(0.8)
+
+
+func _on_attachment_selected(path: String) -> void:
+	var result := AgentManager.send_user_attachment(path, input_edit.text)
+	if bool(result.get("accepted", false)):
+		input_edit.clear()
+		var copied_paths: Array = result.get("copied_paths", [])
+		_set_attachment_status(tr("Attachment sent to %d agent(s).") % copied_paths.size())
+		return
+	var error := str(result.get("error", "copy_failed"))
+	var message := tr("Attachment could not be sent.")
+	if error == "no_target":
+		message = tr("Select an agent or mention one before attaching.")
+	elif error == "file_not_found":
+		message = tr("Selected file is no longer available.")
+	_set_attachment_status(message, true)
+
+
+func _set_attachment_status(message: String, is_error: bool = false) -> void:
+	%AttachmentStatus.text = message
+	%AttachmentStatus.visible = not message.is_empty()
+	%AttachmentStatus.modulate = ThemeManager.color("danger") if is_error else ThemeManager.color("muted")
 
 
 func _on_state_changed(agent_id: String, state: String) -> void:
@@ -417,7 +503,11 @@ func _update_typing_label() -> void:
 
 
 func _autoscroll() -> void:
+	if _autoscroll_pending:
+		return
+	_autoscroll_pending = true
 	await get_tree().process_frame
+	_autoscroll_pending = false
 	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
 
 

@@ -4,21 +4,32 @@ const HOST := "127.0.0.1"
 const PID_PATH := "user://opencode_server.pid"
 const START_TIMEOUT_MS := 20000
 const PROBE_INTERVAL_MS := 300
+const VERSION_CACHE_TTL_MS := 30000
 
 var _pid: int = -1
 var _port: int = 0
 var _starting: bool = false
 var _server_ready: bool = false
+var _server_version: String = ""
+var _model_catalog_changed: bool = false
 var _started_at_ms: int = 0
 var _probe_at_ms: int = 0
 var _callbacks: Array[Callable] = []
+var _installed_version_cache: String = ""
+var _installed_version_probed_at_ms: int = -1
+var _version_thread: Thread
 
 
 func _ready() -> void:
 	_kill_stale_server()
+	_probe_installed_version_async()
 
 
 func _exit_tree() -> void:
+	if _version_thread != null:
+		if _version_thread.is_started():
+			_version_thread.wait_to_finish()
+		_version_thread = null
 	stop_server()
 
 
@@ -48,14 +59,66 @@ func is_ready() -> bool:
 	return _server_ready and _pid > 0 and OS.is_process_running(_pid)
 
 
-func ensure_ready(callback: Callable) -> void:
-	if is_ready():
+func ensure_ready(callback: Callable, starting_agent_id: String = "") -> void:
+	if is_ready() and not _needs_restart():
 		callback.call(true)
 		return
 	if not _callbacks.has(callback):
 		_callbacks.append(callback)
 	if not _starting:
+		if is_ready():
+			if not _can_restart(starting_agent_id):
+				_callbacks.erase(callback)
+				callback.call(true)
+				return
+			_stop_server()
 		_start_server()
+
+
+func mark_model_catalog_refreshed() -> void:
+	_model_catalog_changed = true
+
+
+func _needs_restart() -> bool:
+	if _model_catalog_changed:
+		return true
+	var installed_version := _installed_version()
+	return not _server_version.is_empty() and not installed_version.is_empty() and _server_version != installed_version
+
+
+func _can_restart(starting_agent_id: String) -> bool:
+	var manager := get_node_or_null("/root/AgentManager")
+	return manager == null or not manager.has_method("has_running_agents") or not manager.call("has_running_agents", starting_agent_id)
+
+
+func _installed_version() -> String:
+	if _installed_version_probed_at_ms < 0 or Time.get_ticks_msec() - _installed_version_probed_at_ms >= VERSION_CACHE_TTL_MS:
+		_probe_installed_version_async()
+	return _installed_version_cache
+
+
+func _probe_installed_version_async() -> void:
+	if _version_thread != null:
+		return
+	_installed_version_probed_at_ms = Time.get_ticks_msec()
+	_version_thread = Thread.new()
+	_version_thread.start(_installed_version_worker)
+
+
+func _installed_version_worker() -> void:
+	var output: Array = []
+	var version := ""
+	if OS.execute("opencode", ["--version"], output, true, false) == OK:
+		version = "".join(PackedStringArray(output)).strip_edges()
+	call_deferred("_on_installed_version_probed", version)
+
+
+func _on_installed_version_probed(version: String) -> void:
+	if _version_thread != null:
+		_version_thread.wait_to_finish()
+		_version_thread = null
+	_installed_version_cache = version
+	_installed_version_probed_at_ms = Time.get_ticks_msec()
 
 
 func post(path: String, body: Dictionary, callback: Callable = Callable()) -> void:
@@ -104,12 +167,17 @@ func get_agents(directory: String, callback: Callable) -> void:
 
 
 func stop_server() -> void:
+	_stop_server()
+	_callbacks.clear()
+
+
+func _stop_server() -> void:
 	if _pid > 0 and OS.is_process_running(_pid):
 		OS.kill(_pid)
 	_pid = -1
 	_server_ready = false
+	_server_version = ""
 	_starting = false
-	_callbacks.clear()
 	if FileAccess.file_exists(PID_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(PID_PATH))
 
@@ -117,6 +185,7 @@ func stop_server() -> void:
 func _start_server() -> void:
 	_starting = true
 	_server_ready = false
+	_server_version = ""
 	_port = _find_free_port()
 	_pid = OS.create_process("opencode", ["serve", "--hostname", HOST, "--port", str(_port)], false)
 	if _pid <= 0:
@@ -140,9 +209,12 @@ func _fail_callbacks() -> void:
 func _probe() -> void:
 	var request := HTTPRequest.new()
 	add_child(request)
-	request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+	request.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 		request.queue_free()
 		if code == 200 and not _server_ready:
+			var health: Variant = JSON.parse_string(body.get_string_from_utf8())
+			if health is Dictionary:
+				_server_version = str((health as Dictionary).get("version", ""))
 			_mark_ready()
 	)
 	if request.request(base_url() + "/global/health") != OK:
@@ -152,6 +224,7 @@ func _probe() -> void:
 func _mark_ready() -> void:
 	_server_ready = true
 	_starting = false
+	_model_catalog_changed = false
 	var callbacks := _callbacks.duplicate()
 	_callbacks.clear()
 	for callback in callbacks:

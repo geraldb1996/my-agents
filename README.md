@@ -17,7 +17,7 @@ Aplicación de escritorio en Godot 4 que funciona como interfaz visual para gest
 - **Organización visual por proyecto**: las tarjetas muestran la carpeta del proyecto y permiten asignar un color compartido por los agentes que trabajan en él.
 - **Nombres de sesión personalizados**: renombra sesiones localmente desde el menú del agente para identificarlas con facilidad.
 - **Skills temporales**: añade skills a la sesión desde el Workspace, con opción de quitarlas individualmente o limpiar la lista.
-- **Ajustes del sistema (Sis)**: activa o desactiva sonidos, cambia la interfaz entre inglés y español y elige los temas `light`, `soft` o `dark`. También puedes indicar el idioma de respuesta de los agentes y tu nombre, que se incorporan a sus instrucciones.
+- **Ajustes del sistema (Sis)**: activa o desactiva sonidos, cambia la interfaz entre inglés y español y elige los temas `light`, `soft` o `dark`. También puedes indicar el idioma de respuesta de los agentes y tu nombre, que se incorporan a sus instrucciones. La sección **Defaults** permite restaurar los agentes por defecto (Amy, Lucy, Elliot) si los borraste, sin tocar tus propios agentes, el chat ni las sesiones.
 - **Remote Chat privado**: abre Team Chat desde teléfono o navegador mediante una PWA local, autenticada con token y publicada de forma privada con Tailscale Serve; muestra estados y avatar idle de agentes, filtro y respuesta directa.
 - **Interfaz adaptable**: paneles y diálogos ajustados al tamaño de la ventana, texto nítido al redimensionar y sonidos de notificación del chat.
 

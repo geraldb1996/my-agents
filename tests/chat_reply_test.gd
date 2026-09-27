@@ -28,10 +28,22 @@ func _ready() -> void:
 		var passed: bool = got_chat == str(c["chat"]) and got_think == str(c["think"])
 		ok = ok and passed
 		print("[CHATTEST] pass=", passed, " chat=", got_chat, " think=", got_think)
+	ok = _test_binary_http_request() and ok
 	ok = _test_live_messages() and ok
 	ok = await _test_task_senders() and ok
 	print("[CHATTEST] RESULT=", "PASS" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)
+
+
+func _test_binary_http_request() -> bool:
+	var body := PackedByteArray([0, 255, 65])
+	var raw := "POST /api/remote-chat/v1/attachments HTTP/1.1\r\nContent-Length: 3\r\n\r\n".to_utf8_buffer()
+	raw.append_array(body)
+	var parsed := RemoteChatServer._parse_request(raw)
+	var parsed_body: PackedByteArray = parsed.get("body", PackedByteArray())
+	var ok := str(parsed.get("path", "")) == "/api/remote-chat/v1/attachments" and parsed_body == body
+	print("[CHATTEST] binary attachment parsing=", ok)
+	return ok
 
 
 func _test_live_messages() -> bool:
@@ -101,10 +113,12 @@ func _test_task_senders() -> bool:
 	manager.name = "AgentManagerStub"
 	get_tree().root.add_child.call_deferred(manager)
 	await get_tree().process_frame
+	var saved_history := ProfileStore.chat_history.duplicate(true)
 	var agent := AgentProfile.new()
 	agent.id = "sender_fmt_test_%d" % Time.get_ticks_usec()
 	agent.name = "SenderFmt"
 	agent.project = "/tmp/opencode/sender-fmt-test"
+	DirAccess.make_dir_recursive_absolute(agent.project)
 	manager.sessions[agent.id] = {"state": "offline"}
 	ProfileStore.profiles[agent.id] = agent
 	var ok := true
@@ -127,9 +141,25 @@ func _test_task_senders() -> bool:
 	ok = ok and manager._chat_depth.get(agent.id, -1) == 2
 	manager._deliver_relay(agent.id, agent.id, "direct relay", 1)
 	ok = ok and manager.sent_tasks.size() == 5 and manager.sent_tasks[4] == "[SenderFmt] direct relay"
+	var source_path := "/tmp/opencode/chat-attachment-%d.txt" % Time.get_ticks_usec()
+	var source := FileAccess.open(source_path, FileAccess.WRITE)
+	if source != null:
+		source.store_string("attachment test")
+		source.close()
+	manager.selected_agent_id = agent.id
+	var attachment := manager.send_user_attachment(source_path)
+	var copied_paths: Array = attachment.get("copied_paths", [])
+	ok = ok and bool(attachment.get("accepted", false)) and copied_paths.size() == 1
+	if copied_paths.size() == 1:
+		ok = ok and FileAccess.file_exists(agent.project.path_join(str(copied_paths[0])))
+		DirAccess.remove_absolute(agent.project.path_join(str(copied_paths[0])))
+	DirAccess.remove_absolute(agent.project.path_join(".agents-uploads"))
+	DirAccess.remove_absolute(source_path)
 	manager.sessions.erase(agent.id)
 	var captured_tasks := manager.sent_tasks.duplicate()
 	manager.queue_free()
 	ProfileStore.profiles.erase(agent.id)
+	ProfileStore.chat_history = saved_history
+	ProfileStore._write_text(ProfileStore.CHAT_PATH, JSON.stringify(saved_history, "\t"))
 	print("[CHATTEST] task sender prefixes=", ok, " tasks=", captured_tasks if not ok else [])
 	return ok

@@ -29,6 +29,17 @@ func _ready() -> void:
 	runner._handle_sse_event({"type": "message.part.updated", "properties": {"sessionID": "other_session", "part": {"id": "prt_z", "sessionID": "other_session", "type": "text", "text": "ignore me", "time": {"end": 3}}}})
 	runner._handle_sse_event({"type": "message.part.updated", "properties": {"sessionID": "ses_test", "part": {"id": "prt_f1", "sessionID": "ses_test", "type": "step-finish", "reason": "stop"}}})
 	runner._handle_sse_event({"type": "session.status", "properties": {"sessionID": "ses_test", "status": {"type": "idle"}}})
+	var budget_events: Array = []
+	var budget_runner := OpenCodeRunner.new()
+	add_child(budget_runner)
+	budget_runner.event_received.connect(func(_id: String, event: Dictionary) -> void: budget_events.append(event))
+	for i in range(OpenCodeRunner.MAX_SSE_EVENTS_PER_POLL + 1):
+		budget_runner._sse_buffer += "data: {\"type\":\"permission.replied\",\"properties\":{\"requestID\":\"%d\"}}\n\n" % i
+	budget_runner._consume_sse()
+	var sse_budgeted := budget_events.size() == OpenCodeRunner.MAX_SSE_EVENTS_PER_POLL and not budget_runner._sse_buffer.is_empty()
+	budget_runner._consume_sse()
+	sse_budgeted = sse_budgeted and budget_events.size() == OpenCodeRunner.MAX_SSE_EVENTS_PER_POLL + 1 and budget_runner._sse_buffer.is_empty()
+	budget_runner.queue_free()
 
 	await get_tree().process_frame
 
@@ -36,8 +47,9 @@ func _ready() -> void:
 	for event in _events:
 		types.append(str(event.get("type", "")))
 	var expected: Array[String] = ["text", "reasoning", "reasoning", "step_start", "permission_asked", "question_asked", "step_finish"]
-	var ok: bool = types == expected and streamed_before_end and _events[2]["part"]["text"] == "ing" and _finished == 0 and not runner.running
+	var ok: bool = types == expected and streamed_before_end and _events[2]["part"]["text"] == "ing" and _finished == 0 and not runner.running and sse_budgeted
 	print("[FLOWTEST] events=", types)
 	print("[FLOWTEST] finished=", _finished)
+	print("[FLOWTEST] SSE budget=", sse_budgeted)
 	print("[FLOWTEST] RESULT=", "PASS" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)

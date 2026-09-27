@@ -44,10 +44,10 @@ func _ready() -> void:
 	EventBus.profile_saved.connect(_on_profile_saved)
 	EventBus.profile_deleted.connect(_on_profile_deleted)
 	EventBus.agent_state_changed.connect(_on_state_changed)
-	EventBus.agent_output.connect(_on_agent_output)
 	EventBus.agent_selected.connect(_on_agent_selected)
 	EventBus.agent_context_usage.connect(_on_context_usage)
 	EventBus.session_renamed.connect(_on_session_renamed)
+	EventBus.session_titles_loaded.connect(_on_session_titles_loaded)
 	%NewButton.pressed.connect(_on_new_pressed)
 	%ContextMenu.id_pressed.connect(_on_context_menu_pressed)
 	%ModelMenu.id_pressed.connect(_on_model_menu_pressed)
@@ -203,7 +203,7 @@ func _session_text(profile: AgentProfile) -> String:
 		return "New session"
 	var title := str(session.get("title_override", ""))
 	if title.is_empty():
-		title = AgentManager.get_session_title(sid, profile.project)
+		title = AgentManager.get_cached_session_title(sid, profile.project)
 	if title.is_empty():
 		return tr("Session %s") % sid.right(6)
 	return title
@@ -267,6 +267,11 @@ func _confirm_rename() -> void:
 
 func _on_session_renamed(agent_id: String) -> void:
 	_update_card_session(agent_id)
+
+
+func _on_session_titles_loaded(_project: String) -> void:
+	for agent_id in _cards:
+		_update_card_session(agent_id)
 
 
 func _update_card_session(agent_id: String) -> void:
@@ -405,7 +410,7 @@ func _populate_session_menu(agent_id: String) -> void:
 		var archived := int(entry.get("archived_at", 0))
 		var title := str(entry.get("title", ""))
 		if title.is_empty():
-			title = AgentManager.get_session_title(sid, project)
+			title = AgentManager.get_cached_session_title(sid, project)
 		if title.is_empty():
 			title = tr("Session %s") % sid.right(6)
 		var label := "%s · %s" % [title, Time.get_datetime_string_from_unix_time(archived)]
@@ -511,11 +516,8 @@ func _on_agent_selected(profile: AgentProfile) -> void:
 
 func _on_state_changed(agent_id: String, _state: String) -> void:
 	_update_card_state(agent_id, _get_state(agent_id))
-	_update_card_session(agent_id)
-
-
-func _on_agent_output(agent_id: String, _line: String) -> void:
-	_update_card_session(agent_id)
+	if _get_state(agent_id) not in ["thinking", "working", "reading", "coding", "terminal", "searching", "question", "approval"]:
+		_update_card_session(agent_id)
 
 
 func _update_card_state(agent_id: String, state: String) -> void:

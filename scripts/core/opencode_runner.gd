@@ -4,6 +4,9 @@ extends Node
 signal event_received(agent_id: String, event: Dictionary)
 signal process_finished(agent_id: String, exit_code: int)
 
+const MAX_SSE_CHUNKS_PER_POLL := 8
+const MAX_SSE_EVENTS_PER_POLL := 16
+
 var agent_id: String = ""
 var agent_name: String = ""
 var project: String = ""
@@ -67,7 +70,7 @@ func start(opts: Dictionary) -> bool:
 	_reasoning_text.clear()
 	_last_activity_ms = Time.get_ticks_msec()
 	running = true
-	OpenCodeServer.ensure_ready(_on_server_ready)
+	OpenCodeServer.ensure_ready(_on_server_ready, agent_id)
 	return true
 
 
@@ -181,10 +184,13 @@ func _pump_stream() -> void:
 		if not _sse_connected:
 			_sse_connected = true
 			_send_prompt()
-		var chunk := _http.read_response_body_chunk()
-		while chunk.size() > 0:
+		var chunks_read := 0
+		while chunks_read < MAX_SSE_CHUNKS_PER_POLL:
+			var chunk := _http.read_response_body_chunk()
+			if chunk.is_empty():
+				break
 			_sse_buffer += chunk.get_string_from_utf8()
-			chunk = _http.read_response_body_chunk()
+			chunks_read += 1
 		_consume_sse()
 		return
 	if status == HTTPClient.STATUS_DISCONNECTED and _sse_connected:
@@ -193,12 +199,14 @@ func _pump_stream() -> void:
 
 func _consume_sse() -> void:
 	_sse_buffer = _sse_buffer.replace("\r\n", "\n")
-	while true:
+	var events_processed := 0
+	while events_processed < MAX_SSE_EVENTS_PER_POLL:
 		var idx := _sse_buffer.find("\n\n")
 		if idx < 0:
 			break
 		var block := _sse_buffer.substr(0, idx)
 		_sse_buffer = _sse_buffer.substr(idx + 2)
+		events_processed += 1
 		var data := ""
 		for line in block.split("\n"):
 			if line.begins_with("data:"):

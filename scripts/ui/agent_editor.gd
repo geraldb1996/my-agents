@@ -98,9 +98,9 @@ func _populate_defaults() -> void:
 
 func _ensure_catalogs() -> void:
 	if ModelCatalog.models.is_empty() and not ModelCatalog.loaded_once:
-		ModelCatalog.refresh()
+		ModelCatalog.refresh_async()
 	if SkillCatalog.skills.is_empty() and not SkillCatalog.loaded_once:
-		SkillCatalog.refresh()
+		SkillCatalog.refresh_async(_project_path)
 
 
 func _refresh_opencode_agents() -> void:
@@ -211,7 +211,7 @@ func _on_model_item_selected(index: int) -> void:
 
 
 func _on_refresh_models_pressed() -> void:
-	ModelCatalog.refresh()
+	ModelCatalog.refresh_async()
 
 
 func _populate_variant_items() -> void:
@@ -310,7 +310,7 @@ func _on_skill_item_selected(index: int) -> void:
 
 
 func _on_refresh_skills_pressed() -> void:
-	SkillCatalog.refresh(_project_path)
+	SkillCatalog.refresh_async(_project_path)
 
 
 func _on_skills_loaded() -> void:

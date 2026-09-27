@@ -3,8 +3,10 @@ extends Node
 const CONFIG_PATH := "user://remote_chat.cfg"
 const API_PREFIX := "/api/remote-chat/v1"
 const MAX_BODY_BYTES := 8192
-const MAX_REQUEST_BYTES := 9216
+const MAX_ATTACHMENT_BYTES := 20 * 1024 * 1024
+const MAX_REQUEST_BYTES := MAX_ATTACHMENT_BYTES + 65536
 const DEFAULT_PORT := 38471
+const REMOTE_UPLOADS_DIR := "user://remote-chat-uploads"
 
 var enabled := false
 var port := DEFAULT_PORT
@@ -77,7 +79,7 @@ func stop() -> void:
 
 func _process(_delta: float) -> void:
 	while _server.is_listening() and _server.is_connection_available():
-		_clients.append({"peer": _server.take_connection(), "buffer": ""})
+		_clients.append({"peer": _server.take_connection(), "buffer": PackedByteArray()})
 	for index in range(_clients.size() - 1, -1, -1):
 		var client: Dictionary = _clients[index]
 		var peer: StreamPeerTCP = client.peer
@@ -88,8 +90,10 @@ func _process(_delta: float) -> void:
 		if available > 0:
 			var received := peer.get_data(available)
 			if received[0] == OK:
-				client.buffer += (received[1] as PackedByteArray).get_string_from_utf8()
-		if client.buffer.length() > MAX_REQUEST_BYTES:
+				var buffer: PackedByteArray = client.buffer
+				buffer.append_array(received[1] as PackedByteArray)
+				client.buffer = buffer
+		if (client.buffer as PackedByteArray).size() > MAX_REQUEST_BYTES:
 			_send(peer, 413, {"error": "payload_too_large"})
 			_clients.remove_at(index)
 			continue
@@ -99,11 +103,12 @@ func _process(_delta: float) -> void:
 			_clients.remove_at(index)
 
 
-func _parse_request(raw: String) -> Dictionary:
-	var separator := raw.find("\r\n\r\n")
+func _parse_request(raw: PackedByteArray) -> Dictionary:
+	var text := raw.get_string_from_utf8()
+	var separator := text.find("\r\n\r\n")
 	if separator < 0:
 		return {}
-	var lines := raw.substr(0, separator).split("\r\n")
+	var lines := text.substr(0, separator).split("\r\n")
 	if lines.is_empty():
 		return {"invalid": true}
 	var request_parts := lines[0].split(" ")
@@ -116,12 +121,11 @@ func _parse_request(raw: String) -> Dictionary:
 		if colon > 0:
 			headers[header.substr(0, colon).to_lower()] = header.substr(colon + 1).strip_edges()
 	var length := int(headers.get("content-length", "0"))
-	if length < 0 or length > MAX_BODY_BYTES:
+	if length < 0 or length > MAX_ATTACHMENT_BYTES:
 		return {"oversized": true}
-	var body := raw.substr(separator + 4)
-	if body.to_utf8_buffer().size() < length:
+	if raw.size() < separator + 4 + length:
 		return {}
-	return {"method": request_parts[0], "path": request_parts[1], "headers": headers, "body": body.substr(0, length)}
+	return {"method": request_parts[0], "path": request_parts[1], "headers": headers, "body": raw.slice(separator + 4, separator + 4 + length)}
 
 
 func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
@@ -134,6 +138,9 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 	var raw_path := str(request.path)
 	var query_at := raw_path.find("?")
 	var path := raw_path.substr(0, query_at) if query_at >= 0 else raw_path
+	if (request.body as PackedByteArray).size() > MAX_BODY_BYTES and path != API_PREFIX + "/attachments":
+		_send(peer, 413, {"error": "payload_too_large"})
+		return
 	if request.method == "GET" and _send_pwa_asset(peer, path):
 		return
 	var headers: Dictionary = request.headers
@@ -150,6 +157,63 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 	if path == API_PREFIX + "/agents" and request.method == "GET":
 		_send(peer, 200, {"agents": _remote_agents()})
 		return
+	if path == API_PREFIX + "/models" and request.method == "GET":
+		_send(peer, 200, {"models": ModelCatalog.models})
+		return
+	if path.begins_with(API_PREFIX + "/agents/") and path.ends_with("/model") and request.method == "POST":
+		if not str(headers.get("content-type", "")).to_lower().begins_with("application/json"):
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		var agent_id := path.trim_prefix(API_PREFIX + "/agents/").trim_suffix("/model").uri_decode()
+		var payload = JSON.parse_string((request.body as PackedByteArray).get_string_from_utf8())
+		if payload is not Dictionary or payload.get("model", "") is not String:
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		var model := str(payload.get("model", ""))
+		var profile := ProfileStore.get_profile(agent_id)
+		if profile == null:
+			_send(peer, 404, {"error": "not_found"})
+			return
+		if not model.is_empty() and not ModelCatalog.models.has(model):
+			_send(peer, 400, {"error": "invalid_model"})
+			return
+		AgentManager.set_model(agent_id, model)
+		_send(peer, 200, {"agent": _remote_agent(profile)})
+		return
+	if path == API_PREFIX + "/attachments" and request.method == "POST":
+		if str(headers.get("content-type", "")).to_lower() != "application/octet-stream":
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		if not _allow(host + ":attachment", 10):
+			_send(peer, 429, {"error": "rate_limited"})
+			return
+		var target_agent_id := str(headers.get("x-target-agent-id", "")).uri_decode()
+		var filename := str(headers.get("x-filename", "")).uri_decode()
+		var message := str(headers.get("x-message", "")).uri_decode()
+		if target_agent_id.is_empty() or filename.is_empty() or filename != filename.get_file() or filename in [".", ".."]:
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		var body: PackedByteArray = request.body
+		if body.is_empty():
+			_send(peer, 400, {"error": "bad_request"})
+			return
+		if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(REMOTE_UPLOADS_DIR)) != OK:
+			_send(peer, 503, {"error": "unavailable"})
+			return
+		var temporary_path := ProjectSettings.globalize_path(REMOTE_UPLOADS_DIR.path_join("%d-%s" % [Time.get_ticks_usec(), filename]))
+		var file := FileAccess.open(temporary_path, FileAccess.WRITE)
+		if file == null:
+			_send(peer, 503, {"error": "unavailable"})
+			return
+		file.store_buffer(body)
+		file.close()
+		var result := AgentManager.send_user_attachment(temporary_path, message, target_agent_id)
+		DirAccess.remove_absolute(temporary_path)
+		if bool(result.get("accepted", false)):
+			_send(peer, 201, result)
+		else:
+			_send(peer, 400, result)
+		return
 	if path == API_PREFIX + "/requests" and request.method == "GET":
 		_send(peer, 200, {"requests": AgentManager.get_pending_remote_requests()})
 		return
@@ -160,7 +224,7 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 		if not _allow(host + ":response", 20):
 			_send(peer, 429, {"error": "rate_limited"})
 			return
-		var response_payload = JSON.parse_string(request.body)
+		var response_payload = JSON.parse_string((request.body as PackedByteArray).get_string_from_utf8())
 		if not response_payload is Dictionary:
 			_send(peer, 400, {"error": "bad_request"})
 			return
@@ -196,7 +260,7 @@ func _handle_request(peer: StreamPeerTCP, request: Dictionary) -> void:
 		if not _allow(host + ":message", 20):
 			_send(peer, 429, {"error": "rate_limited"})
 			return
-		var payload = JSON.parse_string(request.body)
+		var payload = JSON.parse_string((request.body as PackedByteArray).get_string_from_utf8())
 		if not payload is Dictionary:
 			_send(peer, 400, {"error": "bad_request"})
 			return
@@ -270,13 +334,19 @@ func _remote_agents() -> Array:
 		var profile := ProfileStore.get_profile(profile_id)
 		if profile == null:
 			continue
-		agents.append({
-			"id": profile.id,
-			"name": profile.name,
-			"state": AgentManager.get_agent_state(profile.id),
-			"avatar_url": API_PREFIX + "/avatars/" + profile.id.uri_encode(),
-		})
+		agents.append(_remote_agent(profile))
 	return agents
+
+
+func _remote_agent(profile: AgentProfile) -> Dictionary:
+	return {
+		"id": profile.id,
+		"name": profile.name,
+		"state": AgentManager.get_agent_state(profile.id),
+		"project": profile.project,
+		"model": profile.model,
+		"avatar_url": API_PREFIX + "/avatars/" + profile.id.uri_encode(),
+	}
 
 
 func _send_agent_avatar(peer: StreamPeerTCP, agent_id: String) -> bool:

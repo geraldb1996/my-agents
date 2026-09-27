@@ -31,6 +31,13 @@ func refresh_async(project_path: String = "") -> void:
 	_thread.start(_refresh_worker.bind(project_path))
 
 
+func _exit_tree() -> void:
+	if _thread != null:
+		if _thread.is_started():
+			_thread.wait_to_finish()
+		_thread = null
+
+
 func _refresh_worker(project_path: String) -> void:
 	_do_refresh(project_path)
 	call_deferred("_finish_async")

@@ -48,6 +48,13 @@
       <div id="agent-roster" class="agent-roster" aria-live="polite">
         <p class="roster-empty">Agent roster will appear when connected.</p>
       </div>
+      <section id="agent-details" class="agent-details" aria-live="polite" hidden>
+        <p id="agent-project" class="agent-detail"></p>
+        <label class="agent-model" for="agent-model">
+          Model
+          <select id="agent-model" disabled></select>
+        </label>
+      </section>
     </section>
 
     <section id="attention-area" class="attention-area" aria-labelledby="attention-title" hidden>
@@ -68,6 +75,8 @@
     <form id="message-form" class="composer">
       <label class="sr-only" for="message-content">Message</label>
       <textarea id="message-content" rows="2" maxlength="8192" placeholder="Write a message" disabled required></textarea>
+      <input id="attachment-file" type="file" hidden>
+      <button id="attach-button" type="button" disabled>Attach</button>
       <button id="send-button" type="submit" disabled>Send</button>
     </form>
   </main>

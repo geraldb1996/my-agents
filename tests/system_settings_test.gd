@@ -4,6 +4,17 @@ var _ok := true
 
 
 func _ready() -> void:
+	var project_folder := "/tmp/myagents-project-picker-test"
+	DirAccess.make_dir_absolute(project_folder)
+	SystemSettings.remove_project_folder(project_folder)
+	_check(SystemSettings.add_project_folder(project_folder) == OK, "Project folder can be saved")
+	_check(SystemSettings.project_folders.has(project_folder), "Saved project folder is available")
+	_check(SystemSettings.save_settings(true, "en", "none", "") == OK, "Saving settings preserves project folders")
+	SystemSettings.load_settings()
+	_check(SystemSettings.project_folders.has(project_folder), "Project folders persist across reload")
+	_check(SystemSettings.remove_project_folder(project_folder) == OK, "Project folder can be removed")
+	_check(not SystemSettings.project_folders.has(project_folder), "Removed project folder is no longer available")
+	DirAccess.remove_absolute(project_folder)
 	for theme_name in ThemeManager.THEME_NAMES:
 		ThemeManager.apply_theme(theme_name)
 		_check(ThemeManager.current_theme == theme_name, "Theme builds and applies: %s" % theme_name)
@@ -27,6 +38,13 @@ func _ready() -> void:
 	_check(dialog.remote_chat_port.value == RemoteChatServer.port, "Remote Chat port loads into settings")
 	_check(dialog.remote_chat_access_url.text == RemoteChatServer.access_url, "Remote Chat access URL loads into settings")
 	_check(not dialog.remote_chat_token.text.is_empty(), "Remote Chat token is available for copying")
+	var saved_access_url := dialog.remote_chat_access_url.text
+	var saved_token := dialog.remote_chat_token.text
+	dialog.remote_chat_access_url.text = "https://desktop.tailnet.ts.net"
+	dialog.remote_chat_token.text = "test-token"
+	_check(dialog._remote_chat_access_link() == "https://desktop.tailnet.ts.net#remote_chat_token=test-token", "Remote Chat access link includes its token")
+	dialog.remote_chat_access_url.text = saved_access_url
+	dialog.remote_chat_token.text = saved_token
 	dialog.agents_language_select.select(1)
 	dialog.agents_language_select.item_selected.emit(1)
 	_check(dialog.agents_language_edit.visible and dialog.save_button.disabled, "Type requires a nonempty language")
@@ -75,6 +93,23 @@ func _ready() -> void:
 	_check(dialog.agents_language_select.selected == 1 and dialog.agents_language_edit.text == "Japanese", "Dialog restores saved values")
 	_check(dialog.ui_theme_select.selected == 1, "Dialog restores saved theme")
 	_check(dialog.user_name_edit.text == "Gerald", "Dialog restores saved user name")
+	var restore_button: Button = dialog.get_node("%RestoreDefaultAgentsButton")
+	var restore_dialog: ConfirmationDialog = dialog.get_node("%RestoreDefaultsDialog")
+	_check(restore_button != null and restore_dialog != null, "Restore defaults controls exist")
+	var restore_custom := AgentProfile.new()
+	restore_custom.id = "ag_settings_restore_test"
+	restore_custom.name = "Settings Restore Test"
+	ProfileStore.save_profile(restore_custom)
+	ProfileStore.delete_profile("ag_default_elliot")
+	restore_button.pressed.emit()
+	await get_tree().process_frame
+	_check(restore_dialog.visible, "Restore defaults confirmation opens")
+	restore_dialog.confirmed.emit()
+	await get_tree().process_frame
+	_check(ProfileStore.get_profile("ag_default_elliot") != null, "Restore defaults re-adds missing default agent")
+	_check(ProfileStore.get_profile("ag_settings_restore_test") != null, "Restore defaults keeps custom agents")
+	_check(dialog.restore_defaults_status.text != "", "Restore defaults shows a status message")
+	ProfileStore.delete_profile("ag_settings_restore_test")
 	dialog.remote_chat_enabled.button_pressed = false
 	dialog.remote_chat_port.value = 38471
 	dialog.save_button.pressed.emit()

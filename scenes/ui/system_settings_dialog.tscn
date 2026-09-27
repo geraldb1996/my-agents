@@ -186,7 +186,7 @@ text = "Copy Token"
 [node name="CopyRemoteChatUrlButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Copy Local API URL"
+text = "Copy Access Link"
 
 [node name="ShowRemoteChatQrButton" type="Button" parent="Background/Layout/Scroll/Form/RemoteChatActions"]
 unique_name_in_owner = true
@@ -198,11 +198,37 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 2
 
+[node name="DefaultsLabel" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Defaults"
+
+[node name="RestoreDefaultAgentsHint" type="Label" parent="Background/Layout/Scroll/Form"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Restore the default agents (Amy, Lucy, Elliot) if they were deleted. Your own agents, chat and sessions are kept."
+
+[node name="RestoreDefaultAgentsButton" type="Button" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Restore default agents"
+
+[node name="RestoreDefaultsStatus" type="Label" parent="Background/Layout/Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+
 [node name="SettingsError" type="Label" parent="Background/Layout/Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
 modulate = Color(1, 0.45, 0.45, 1)
 autowrap_mode = 2
+
+[node name="RestoreDefaultsDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "Restore default agents"
+dialog_text = "Restore the default agents (Amy, Lucy, Elliot) that are missing? Your own agents, chat and sessions are kept."
+ok_button_text = "Restore"
 
 [node name="Actions" type="HBoxContainer" parent="Background/Layout"]
 layout_mode = 2

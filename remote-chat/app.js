@@ -5,13 +5,13 @@
   const BASE_KEY = "remote-chat-api-base";
   const TOKEN_KEY = "remote-chat-token";
   const pollEvery = { visible: 3000, hidden: 30000 };
-  const state = { base: "", token: "", cursor: "", connected: false, pollTimer: 0, messages: new Map(), pending: new Map(), agents: [], selectedAgentId: "", selectedAgentName: "", rosterAvailable: true, avatarUrls: new Map(), requests: [], requestRevision: "", requestDrafts: new Map(), requestErrors: new Map(), requestSending: new Set(), requestFetchError: "", requestNotice: "" };
+  const state = { base: "", token: "", cursor: "", connected: false, pollTimer: 0, messages: new Map(), pending: new Map(), agents: [], models: [], selectedAgentId: "", selectedAgentName: "", rosterAvailable: true, avatarUrls: new Map(), requests: [], requestRevision: "", requestDrafts: new Map(), requestErrors: new Map(), requestSending: new Set(), requestFetchError: "", requestNotice: "" };
 
   const elements = {
     apiBase: document.querySelector("#api-base"), token: document.querySelector("#token"), panel: document.querySelector("#connection-panel"),
     status: document.querySelector("#status"), delivery: document.querySelector("#delivery-status"), messages: document.querySelector("#messages"),
-    content: document.querySelector("#message-content"), send: document.querySelector("#send-button"), filter: document.querySelector("#agent-filter"), roster: document.querySelector("#agent-roster"),
-    attention: document.querySelector("#attention-area"), attentionCount: document.querySelector("#attention-count"), attentionStatus: document.querySelector("#attention-status"), requestList: document.querySelector("#request-list")
+    content: document.querySelector("#message-content"), send: document.querySelector("#send-button"), attach: document.querySelector("#attach-button"), attachmentFile: document.querySelector("#attachment-file"), filter: document.querySelector("#agent-filter"), roster: document.querySelector("#agent-roster"),
+    attention: document.querySelector("#attention-area"), attentionCount: document.querySelector("#attention-count"), attentionStatus: document.querySelector("#attention-status"), requestList: document.querySelector("#request-list"), agentDetails: document.querySelector("#agent-details"), agentProject: document.querySelector("#agent-project"), agentModel: document.querySelector("#agent-model")
   };
 
   function apiUrl(path) { return `${state.base}${API_PATH}${path}`; }
@@ -24,7 +24,7 @@
   }
   function setStatus(text, kind = "") { elements.status.textContent = text; elements.status.className = `status ${kind}`; }
   function setDelivery(text = "", isError = false) { elements.delivery.textContent = text; elements.delivery.className = isError ? "delivery-status error" : "delivery-status"; }
-  function setComposerEnabled(enabled) { elements.content.disabled = !enabled; elements.send.disabled = !enabled; elements.filter.disabled = !enabled; }
+  function setComposerEnabled(enabled) { elements.content.disabled = !enabled; elements.send.disabled = !enabled; elements.attach.disabled = !enabled; elements.filter.disabled = !enabled; }
 
   async function request(path, options = {}) {
     const headers = new Headers(options.headers);
@@ -58,6 +58,11 @@
     return agentId === state.selectedAgentId || (!agentId && agent && message.sender === agent.name);
   }
 
+  function isFollowingLatest() {
+    const { scrollTop, clientHeight, scrollHeight } = elements.messages;
+    return scrollHeight - scrollTop - clientHeight <= 24;
+  }
+
   function renderMessage(message) {
     const item = document.createElement("li");
     item.className = `message${isSystemMessage(message) ? " system" : message.is_agent ? " agent" : " mine"}${message.pending ? " pending" : ""}`;
@@ -72,24 +77,28 @@
       const reply = document.createElement("button"); reply.className = "reply"; reply.type = "button"; reply.textContent = "Reply";
       reply.addEventListener("click", () => { selectAgent(messageAgentId(message), message.sender); }); item.append(reply);
     }
-    elements.messages.append(item); elements.messages.scrollTop = elements.messages.scrollHeight;
+    elements.messages.append(item);
   }
 
-  function renderMessages() {
+  function renderMessages(followLatest = isFollowingLatest()) {
+    const previousScrollTop = elements.messages.scrollTop;
     elements.messages.replaceChildren();
     for (const message of state.messages.values()) if (matchesSelectedAgent(message)) renderMessage(message);
+    elements.messages.scrollTop = followLatest ? elements.messages.scrollHeight : previousScrollTop;
   }
 
   function addMessage(message) {
     if (!message || !message.id || state.messages.has(message.id)) return;
-    state.messages.set(message.id, message); renderMessages();
+    const followLatest = isFollowingLatest();
+    state.messages.set(message.id, message); renderMessages(followLatest);
   }
 
   function removePending(id) {
+    const followLatest = isFollowingLatest();
     const item = elements.messages.querySelector(`[data-message-id="${id}"]`);
     if (item) item.remove();
     state.messages.delete(id);
-    renderMessages();
+    renderMessages(followLatest);
   }
 
   function deliveryText(data) {
@@ -121,12 +130,26 @@
     }
     const list = document.createElement("ul"); list.className = "agent-list";
     for (const agent of state.agents) {
-      const item = document.createElement("li"); item.className = "agent-card";
-      if (agent.avatarSrc) { const avatar = document.createElement("img"); avatar.className = "agent-avatar"; avatar.src = agent.avatarSrc; avatar.alt = ""; item.append(avatar); }
-      const text = document.createElement("span"); text.textContent = `${agent.name || "Agent"} is ${agent.state || "working"}...`;
-      item.append(text); list.append(item);
+      const item = document.createElement("li");
+      const button = document.createElement("button"); button.className = `agent-card${agent.id === selected ? " selected" : ""}`; button.type = "button";
+      if (agent.avatarSrc) { const avatar = document.createElement("img"); avatar.className = "agent-avatar"; avatar.src = agent.avatarSrc; avatar.alt = ""; button.append(avatar); }
+      const summary = document.createElement("span"); summary.className = "agent-summary";
+      const name = document.createElement("span"); name.textContent = `${agent.name || "Agent"} is ${agent.state || "working"}...`;
+      const project = document.createElement("small"); project.className = "agent-project"; project.textContent = agent.project || "No project assigned"; project.title = agent.project || "No project assigned";
+      summary.append(name, project); button.append(summary); button.addEventListener("click", () => selectAgent(agent.id, agent.name)); item.append(button); list.append(item);
     }
     elements.roster.replaceChildren(list);
+  }
+
+  function renderAgentDetails() {
+    const agent = state.agents.find((item) => item.id === state.selectedAgentId);
+    elements.agentDetails.hidden = !agent;
+    if (!agent) return;
+    elements.agentProject.textContent = agent.project ? `Project: ${agent.project}` : "Project: Not assigned";
+    const models = agent.model && !state.models.includes(agent.model) ? [agent.model, ...state.models] : state.models;
+    elements.agentModel.replaceChildren(new Option("Default (auto)", ""), ...models.map((model) => new Option(model, model)));
+    elements.agentModel.value = agent.model || "";
+    elements.agentModel.disabled = !state.connected;
   }
 
   async function loadRoster() {
@@ -138,6 +161,13 @@
       state.rosterAvailable = true;
     } catch (_) { state.rosterAvailable = false; }
     renderRoster(); renderMessages();
+    renderAgentDetails();
+  }
+
+  async function loadModels() {
+    const data = await request("/models");
+    state.models = Array.isArray(data.models) ? data.models.filter((model) => typeof model === "string") : [];
+    renderAgentDetails();
   }
 
   function requestKey(item) { return `${item.kind || "request"}:${item.agent_id || ""}:${item.request_id || ""}`; }
@@ -344,7 +374,24 @@
       state.selectedAgentId = matchingAgent ? matchingAgent.id : state.selectedAgentId;
       state.selectedAgentName = matchingAgent ? matchingAgent.name : state.selectedAgentName;
     }
-    renderRoster(); renderMessages(); elements.content.focus();
+    elements.filter.value = state.selectedAgentId;
+    renderRoster(); renderMessages(); renderAgentDetails(); elements.content.focus();
+  }
+
+  async function changeModel() {
+    const agent = state.agents.find((item) => item.id === state.selectedAgentId);
+    if (!agent || !state.connected) return;
+    const model = elements.agentModel.value;
+    elements.agentModel.disabled = true;
+    try {
+      const data = await request(`/agents/${encodeURIComponent(agent.id)}/model`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+      if (data.agent) Object.assign(agent, data.agent);
+      setDelivery(`${agent.name || "Agent"} model updated.`);
+      renderRoster(); renderAgentDetails();
+    } catch (error) {
+      setDelivery(`Model update failed: ${error.message}`, true);
+      renderAgentDetails();
+    }
   }
 
   function schedulePoll() {
@@ -375,7 +422,7 @@
       for (const url of state.avatarUrls.values()) URL.revokeObjectURL(url);
       state.avatarUrls.clear(); state.connected = true; state.cursor = ""; state.messages.clear(); state.requests = []; state.requestRevision = ""; state.requestDrafts.clear(); state.requestErrors.clear(); state.requestFetchError = ""; state.requestNotice = ""; elements.messages.replaceChildren(); renderRequests();
       await loadMessages(true);
-      await loadRoster();
+      await loadRoster(); await loadModels();
       await loadRequests();
       elements.panel.hidden = true; setComposerEnabled(true); setStatus("Connected", "online"); setDelivery(); schedulePoll();
     } catch (error) { markDisconnected(error.message); schedulePoll(); }
@@ -401,6 +448,24 @@
     }
   }
 
+  async function sendAttachment(file) {
+    const agent = state.agents.find((item) => item.id === state.selectedAgentId);
+    if (!agent) { setDelivery("Select one agent before attaching a file.", true); return; }
+    elements.attach.disabled = true;
+    try {
+      const data = await request("/attachments", { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-Target-Agent-Id": encodeURIComponent(agent.id), "X-Filename": encodeURIComponent(file.name), "X-Message": encodeURIComponent(elements.content.value.trim()) }, body: file });
+      elements.content.value = "";
+      elements.attachmentFile.value = "";
+      setDelivery(`Attachment sent to ${agent.name || "agent"}.`);
+      if (data.message) addMessage(data.message);
+      await loadMessages();
+    } catch (error) {
+      setDelivery(`Attachment failed: ${error.message}`, true);
+    } finally {
+      elements.attach.disabled = !state.connected;
+    }
+  }
+
   document.querySelector("#connection-form").addEventListener("submit", (event) => { event.preventDefault(); connect(); });
   document.querySelector("#settings-toggle").addEventListener("click", () => { elements.panel.hidden = !elements.panel.hidden; });
   document.querySelector("#close-settings").addEventListener("click", () => { elements.panel.hidden = true; });
@@ -410,11 +475,14 @@
     addMessage({ id: pending.id, sender: "You", content, timestamp: Date.now(), is_agent: false, pending: true });
     elements.content.value = ""; sendPending(pending);
   });
+  elements.attach.addEventListener("click", () => elements.attachmentFile.click());
+  elements.attachmentFile.addEventListener("change", () => { const file = elements.attachmentFile.files[0]; if (file) sendAttachment(file); });
   elements.filter.addEventListener("change", () => {
     state.selectedAgentId = elements.filter.value;
     state.selectedAgentName = state.agents.find((agent) => agent.id === state.selectedAgentId)?.name || "";
-    renderMessages();
+    renderMessages(); renderRoster(); renderAgentDetails();
   });
+  elements.agentModel.addEventListener("change", changeModel);
   window.addEventListener("online", connect);
   window.addEventListener("offline", () => markDisconnected("Network unavailable."));
   window.addEventListener("focus", () => { if (state.base && state.token) { loadMessages().catch((error) => markDisconnected(error.message)); loadRoster(); loadRequests(); schedulePoll(); } });

@@ -35,6 +35,9 @@ var _output_history: Dictionary = {}
 var _last_reasoning_part: Dictionary = {}
 var _session_titles: Dictionary = {}
 var _session_titles_loaded_at: Dictionary = {}
+var _session_title_threads: Dictionary = {}
+var _session_titles_queue: Array[String] = []
+var _session_titles_inflight: String = ""
 var _pending_permissions: Dictionary = {}
 var _pending_questions: Dictionary = {}
 var _last_error: Dictionary = {}
@@ -59,12 +62,23 @@ func _ready() -> void:
 		sessions[profile_id] = ProfileStore.load_session(profile_id)
 		if not sessions[profile_id].has("state"):
 			sessions[profile_id]["state"] = "offline"
+	_prewarm_session_titles()
 
 
 func _process(_delta: float) -> void:
 	for agent_id in _runners.keys():
 		(_runners[agent_id] as OpenCodeRunner).poll()
 	_apply_git_refresh()
+
+
+func _exit_tree() -> void:
+	for project in _session_title_threads.keys():
+		var thread: Thread = _session_title_threads[project]
+		if thread.is_started():
+			thread.wait_to_finish()
+	_session_title_threads.clear()
+	_session_titles_queue.clear()
+	_session_titles_inflight = ""
 
 
 func get_profile(agent_id: String) -> AgentProfile:
@@ -88,9 +102,8 @@ func start_agent(agent_id: String) -> void:
 	var session := get_session(agent_id)
 	if not session.has("opencode_session"):
 		session["opencode_session"] = ""
-	session["state"] = "idle"
-	ProfileStore.save_session(agent_id, session)
 	set_state(agent_id, "idle")
+	ProfileStore.save_session(agent_id, session)
 	EventBus.agent_started.emit(agent_id)
 
 
@@ -130,10 +143,9 @@ func send_task(agent_id: String, task: String, sender_name: String = "User") -> 
 	var formatted_task := "[%s] %s" % [sender_name, task]
 	var session := get_session(agent_id)
 	session["task"] = formatted_task
-	session["state"] = "thinking"
+	set_state(agent_id, "thinking")
 	ProfileStore.save_session(agent_id, session)
 	EventBus.agent_task_updated.emit(agent_id, formatted_task)
-	set_state(agent_id, "thinking")
 	if not _spawn_runner(agent_id, formatted_task):
 		return TASK_LAUNCH_FAILED
 	return TASK_OK
@@ -150,13 +162,9 @@ func send_chat_message(agent_id: String, content: String) -> int:
 	return send_task(agent_id, content)
 
 
-func send_user_message(text: String, target_agent_id: String = "") -> Dictionary:
-	var content := text.strip_edges()
-	if content.is_empty():
-		return {"accepted": false, "error": "empty_content"}
-	var mentions := ProfileStore.extract_mentions(content)
-	var message := _append_and_publish("user", content, mentions, false)
+func get_user_message_targets(text: String, target_agent_id: String = "") -> Array[String]:
 	var targets: Array[String] = []
+	var mentions := ProfileStore.extract_mentions(text)
 	if not mentions.is_empty():
 		if mentions.has("all"):
 			for profile_id in ProfileStore.profiles:
@@ -168,6 +176,59 @@ func send_user_message(text: String, target_agent_id: String = "") -> Dictionary
 		targets.append(target_agent_id)
 	elif not selected_agent_id.is_empty():
 		targets.append(selected_agent_id)
+	return targets
+
+
+func send_user_attachment(source_path: String, message: String = "", target_agent_id: String = "") -> Dictionary:
+	if not FileAccess.file_exists(source_path):
+		return {"accepted": false, "error": "file_not_found"}
+	var targets := get_user_message_targets(message, target_agent_id)
+	if targets.is_empty():
+		return {"accepted": false, "error": "no_target"}
+	var filename := source_path.get_file()
+	if filename.is_empty():
+		return {"accepted": false, "error": "invalid_file"}
+	var copied_targets: Array[String] = []
+	var copied_paths: Array[String] = []
+	var errors: Array[String] = []
+	for agent_id in targets:
+		var profile := get_profile(agent_id)
+		if profile == null or profile.project.is_empty():
+			errors.append(agent_id)
+			continue
+		var project_path := ProjectSettings.globalize_path(profile.project)
+		if not DirAccess.dir_exists_absolute(project_path):
+			errors.append(agent_id)
+			continue
+		var uploads_path := project_path.path_join(".agents-uploads")
+		if DirAccess.make_dir_recursive_absolute(uploads_path) != OK:
+			errors.append(agent_id)
+			continue
+		var relative_path := ".agents-uploads/%d-%s" % [Time.get_unix_time_from_system() * 1000, filename]
+		var destination := project_path.path_join(relative_path)
+		if DirAccess.copy_absolute(source_path, destination) != OK:
+			errors.append(agent_id)
+			continue
+		copied_targets.append(agent_id)
+		copied_paths.append(relative_path)
+	if copied_targets.is_empty():
+		return {"accepted": false, "error": "copy_failed", "errors": errors}
+	var paths := "\n".join(copied_paths)
+	var notice := "Attachment copied to:\n%s\nRead the attachment before responding." % paths
+	var content := notice if message.strip_edges().is_empty() else message.strip_edges() + "\n\n" + notice
+	var result := send_user_message(content, "", copied_targets)
+	result["copied_paths"] = copied_paths
+	result["errors"] = errors
+	return result
+
+
+func send_user_message(text: String, target_agent_id: String = "", explicit_targets: Array[String] = []) -> Dictionary:
+	var content := text.strip_edges()
+	if content.is_empty():
+		return {"accepted": false, "error": "empty_content"}
+	var mentions := ProfileStore.extract_mentions(content)
+	var message := _append_and_publish("user", content, mentions, false)
+	var targets := explicit_targets if not explicit_targets.is_empty() else get_user_message_targets(content, target_agent_id)
 	var results: Array = []
 	if targets.is_empty():
 		_append_and_publish("system", "No agent targeted. Select an agent in the left panel or use @AgentName / @all.", [], false)
@@ -195,6 +256,16 @@ func get_agent_state(agent_id: String) -> String:
 	return str((sessions.get(agent_id, {}) as Dictionary).get("state", "offline"))
 
 
+func has_running_agents(except_agent_id: String = "") -> bool:
+	for agent_id in _runners:
+		if agent_id == except_agent_id:
+			continue
+		var runner: OpenCodeRunner = _runners[agent_id]
+		if runner.running:
+			return true
+	return false
+
+
 func _append_and_publish(sender: String, content: String, mentions: Array, is_agent: bool, session_id = null) -> Dictionary:
 	var timestamp := Time.get_unix_time_from_system() * 1000
 	var message := ProfileStore.append_chat_message(sender, content, mentions, timestamp, is_agent, session_id)
@@ -219,6 +290,20 @@ func delete_session(agent_id: String) -> void:
 	_reset_temp_skills(agent_id)
 	emit_output(agent_id, "[session] deleted — next task starts fresh")
 	set_state(agent_id, "offline")
+
+
+func delete_archived_session(agent_id: String, opencode_session_id: String) -> void:
+	if opencode_session_id.is_empty():
+		return
+	var history := ProfileStore.load_session_history(agent_id)
+	var remaining: Array = []
+	for entry in history:
+		if entry is Dictionary and str(entry.get("opencode_session", "")) == opencode_session_id:
+			continue
+		remaining.append(entry)
+	ProfileStore.save_session_history(agent_id, remaining)
+	if selected_agent_id == agent_id:
+		emit_output(agent_id, "[session] archived session deleted: %s" % opencode_session_id)
 
 
 func new_session(agent_id: String) -> void:
@@ -436,7 +521,9 @@ func _archive_session(agent_id: String) -> void:
 	history.append({
 		"opencode_session": sid,
 		"archived_at": Time.get_unix_time_from_system(),
-		"title": override if not override.is_empty() else get_session_title(sid, _project_of(agent_id)),
+		"title": override if not override.is_empty() else get_cached_session_title(sid, _project_of(agent_id)),
+		"context_tokens": int(get_session(agent_id).get("context_tokens", 0)),
+		"context_percent": float(get_session(agent_id).get("context_percent", 0.0)),
 	})
 	ProfileStore.save_session_history(agent_id, history)
 
@@ -499,7 +586,10 @@ func clear_temp_skills(agent_id: String) -> void:
 
 
 func set_state(agent_id: String, state: String) -> void:
-	get_session(agent_id)["state"] = state
+	var session := get_session(agent_id)
+	if str(session.get("state", "")) == state:
+		return
+	session["state"] = state
 	EventBus.agent_state_changed.emit(agent_id, state)
 
 
@@ -525,17 +615,42 @@ func get_file_status(agent_id: String) -> Dictionary:
 
 
 const SESSION_TITLES_TTL := 20.0
+const SESSION_TITLES_LIMIT := 300
 
 
 func get_session_title(session_id: String, project: String = "") -> String:
 	if session_id.is_empty():
 		return ""
-	_ensure_session_titles(project)
-	var title := str((_session_titles.get(project, {}) as Dictionary).get(session_id, ""))
+	if _session_titles_stale(project):
+		_load_session_titles_sync(project)
+	var title := _lookup_session_title(session_id, project)
 	if title.is_empty() and not project.is_empty():
-		_ensure_session_titles("")
-		title = str((_session_titles.get("", {}) as Dictionary).get(session_id, ""))
+		if _session_titles_stale(""):
+			_load_session_titles_sync("")
+		title = _lookup_session_title(session_id, "")
 	return title
+
+
+func get_cached_session_title(session_id: String, project: String = "") -> String:
+	if session_id.is_empty():
+		return ""
+	if _session_titles_stale(project):
+		_request_session_titles(project)
+	var title := _lookup_session_title(session_id, project)
+	if title.is_empty() and not project.is_empty():
+		if _session_titles_stale(""):
+			_request_session_titles("")
+		title = _lookup_session_title(session_id, "")
+	return title
+
+
+func _prewarm_session_titles() -> void:
+	var projects: Dictionary = {}
+	for profile_id in ProfileStore.profiles:
+		var profile: AgentProfile = ProfileStore.profiles[profile_id]
+		projects[str(profile.project).strip_edges()] = true
+	for project in projects:
+		_request_session_titles(str(project))
 
 
 func _project_of(agent_id: String) -> String:
@@ -543,29 +658,82 @@ func _project_of(agent_id: String) -> String:
 	return profile.project if profile != null else ""
 
 
-func _ensure_session_titles(project: String) -> void:
-	var now := Time.get_ticks_msec() / 1000.0
+func _session_titles_stale(project: String) -> bool:
 	var loaded_at := float(_session_titles_loaded_at.get(project, -1.0))
-	if loaded_at >= 0.0 and now - loaded_at < SESSION_TITLES_TTL:
-		return
-	_session_titles_loaded_at[project] = now
+	if loaded_at < 0.0:
+		return true
+	return Time.get_ticks_msec() / 1000.0 - loaded_at >= SESSION_TITLES_TTL
+
+
+func _lookup_session_title(session_id: String, project: String) -> String:
+	return str((_session_titles.get(project, {}) as Dictionary).get(session_id, ""))
+
+
+func _load_session_titles_sync(project: String) -> void:
+	_session_titles_loaded_at[project] = Time.get_ticks_msec() / 1000.0
 	_session_titles.erase(project)
+	var titles: Variant = _fetch_session_titles(project)
+	if titles is Dictionary:
+		_session_titles[project] = titles
+
+
+func _request_session_titles(project: String) -> void:
+	if project == _session_titles_inflight or _session_titles_queue.has(project):
+		return
+	_session_titles_queue.append(project)
+	_start_next_session_titles_load()
+
+
+func _start_next_session_titles_load() -> void:
+	if not _session_titles_inflight.is_empty() or _session_titles_queue.is_empty():
+		return
+	var project: String = _session_titles_queue.pop_front()
+	_session_titles_inflight = project
+	_session_titles_loaded_at[project] = Time.get_ticks_msec() / 1000.0
+	var thread := Thread.new()
+	_session_title_threads[project] = thread
+	thread.start(_session_titles_worker.bind(project))
+
+
+func _session_titles_worker(project: String) -> void:
+	var titles: Variant = _fetch_session_titles(project)
+	call_deferred("_on_session_titles_loaded", project, titles)
+
+
+func _on_session_titles_loaded(project: String, titles: Variant) -> void:
+	if _session_title_threads.has(project):
+		var thread: Thread = _session_title_threads[project]
+		_session_title_threads.erase(project)
+		if thread.is_started():
+			thread.wait_to_finish()
+	if titles is Dictionary:
+		_session_titles[project] = titles
+	if _session_titles_inflight == project:
+		_session_titles_inflight = ""
+	EventBus.session_titles_loaded.emit(project)
+	_start_next_session_titles_load()
+
+
+func _fetch_session_titles(project: String) -> Variant:
 	var output: Array = []
-	var cmd := "opencode session list --format json -n 300 </dev/null"
+	var cmd := "opencode session list --format json -n %d </dev/null" % SESSION_TITLES_LIMIT
 	if not project.is_empty():
 		cmd = "cd %s && %s" % [_shell_quote(project), cmd]
 	if OS.execute("bash", ["-c", cmd], output, false, false) != OK:
-		return
-	var parsed = JSON.parse_string(_extract_json("\n".join(output)))
+		return null
+	var text := _extract_json("\n".join(output))
+	if not text.begins_with("[") and not text.begins_with("{"):
+		return null
+	var parsed = JSON.parse_string(text)
 	if not parsed is Array:
-		return
+		return null
 	var titles: Dictionary = {}
 	for entry in parsed:
 		if entry is Dictionary:
 			var id := str(entry.get("id", ""))
 			if not id.is_empty():
 				titles[id] = str(entry.get("title", ""))
-	_session_titles[project] = titles
+	return titles
 
 
 func _shell_quote(s: String) -> String:
@@ -994,9 +1162,8 @@ func _normalize_file_path(agent_id: String, path: String) -> String:
 func _finish_task(agent_id: String) -> void:
 	var session := get_session(agent_id)
 	session["task"] = ""
-	session["state"] = "success"
-	ProfileStore.save_session(agent_id, session)
 	set_state(agent_id, "success")
+	ProfileStore.save_session(agent_id, session)
 	await get_tree().create_timer(2.5).timeout
 	if sessions.has(agent_id) and str(sessions[agent_id].get("state", "")) == "success":
 		set_state(agent_id, "idle")

@@ -11,6 +11,7 @@ var ui_theme: String = "dark"
 var agents_language_mode: String = "none"
 var agents_language: String = ""
 var user_name: String = ""
+var project_folders: PackedStringArray = []
 
 
 func _ready() -> void:
@@ -34,6 +35,7 @@ func load_settings() -> void:
 	if agents_language_mode not in ["none", "type"] or agents_language.is_empty():
 		agents_language_mode = "none"
 	user_name = str(config.get_value("agents", "user_name", "")).strip_edges()
+	project_folders = _valid_project_folders(config.get_value("workspace", "project_folders", PackedStringArray()))
 	_apply_settings()
 
 
@@ -47,6 +49,7 @@ func save_settings(sounds: bool, locale: String, language_mode: String, language
 	if not ThemeManager.is_valid_theme(theme):
 		return ERR_INVALID_PARAMETER
 	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
 	config.set_value("ui", "sounds", sounds)
 	config.set_value("ui", "language", locale)
 	config.set_value("ui", "theme", theme)
@@ -65,6 +68,44 @@ func save_settings(sounds: bool, locale: String, language_mode: String, language
 	user_name = user
 	_apply_settings()
 	return OK
+
+
+func add_project_folder(path: String) -> Error:
+	path = path.strip_edges()
+	if path.is_empty() or not DirAccess.dir_exists_absolute(path):
+		return ERR_INVALID_PARAMETER
+	if not project_folders.has(path):
+		project_folders.append(path)
+	return _save_project_folders()
+
+
+func remove_project_folder(path: String) -> Error:
+	project_folders.erase(path)
+	return _save_project_folders()
+
+
+func _save_project_folders() -> Error:
+	var config := ConfigFile.new()
+	var load_error := config.load(SETTINGS_PATH)
+	if load_error != OK and load_error != ERR_FILE_NOT_FOUND:
+		push_warning("Could not load system settings: %s" % error_string(load_error))
+		return load_error
+	config.set_value("workspace", "project_folders", project_folders)
+	var error := config.save(SETTINGS_PATH)
+	if error != OK:
+		push_warning("Could not save project folders: %s" % error_string(error))
+	return error
+
+
+func _valid_project_folders(value: Variant) -> PackedStringArray:
+	var folders := PackedStringArray()
+	if value is not Array and value is not PackedStringArray:
+		return folders
+	for path in value:
+		var folder := str(path).strip_edges()
+		if not folder.is_empty() and not folders.has(folder):
+			folders.append(folder)
+	return folders
 
 
 func _apply_settings() -> void:

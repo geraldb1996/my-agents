@@ -73,6 +73,7 @@ func _on_catalog_loaded() -> void:
 	await tween.finished
 	loading_overlay.visible = false
 	agents_panel.refresh()
+	UpdateManager.check_for_updates()
 
 
 func _on_new_agent() -> void:

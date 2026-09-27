@@ -12,6 +12,7 @@ extends Window
 @onready var remote_chat_access_url: LineEdit = %RemoteChatAccessUrl
 @onready var remote_chat_token: LineEdit = %RemoteChatToken
 @onready var remote_chat_status: Label = %RemoteChatStatus
+@onready var restore_defaults_status: Label = %RestoreDefaultsStatus
 @onready var error_label: Label = %SettingsError
 @onready var save_button: Button = %SaveSettingsButton
 
@@ -24,6 +25,8 @@ func _ready() -> void:
 	%CopyRemoteChatTokenButton.pressed.connect(_on_copy_token_pressed)
 	%CopyRemoteChatUrlButton.pressed.connect(_on_copy_url_pressed)
 	%ShowRemoteChatQrButton.pressed.connect(_on_show_qr_pressed)
+	%RestoreDefaultAgentsButton.pressed.connect(_on_restore_defaults_pressed)
+	%RestoreDefaultsDialog.confirmed.connect(_on_restore_defaults_confirmed)
 	agents_language_select.item_selected.connect(_on_language_mode_selected)
 	agents_language_edit.text_changed.connect(func(_text: String): _update_language_input())
 	get_tree().root.size_changed.connect(_fit_to_application)
@@ -41,6 +44,7 @@ func open() -> void:
 	remote_chat_access_url.text = RemoteChatServer.access_url
 	remote_chat_token.text = RemoteChatServer.get_token()
 	_update_remote_chat_status()
+	restore_defaults_status.text = ""
 	error_label.text = ""
 	_update_language_input()
 	popup()
@@ -100,8 +104,15 @@ func _on_copy_token_pressed() -> void:
 
 
 func _on_copy_url_pressed() -> void:
-	DisplayServer.clipboard_set("http://127.0.0.1:%s" % int(remote_chat_port.value))
-	remote_chat_status.text = tr("Local API URL copied. Publish it with Tailscale Serve for remote access.")
+	DisplayServer.clipboard_set(_remote_chat_access_link())
+	remote_chat_status.text = tr("Remote Chat access link copied.")
+
+
+func _remote_chat_access_link() -> String:
+	var base_url := remote_chat_access_url.text.strip_edges().trim_suffix("/")
+	if base_url.is_empty():
+		base_url = "http://127.0.0.1:%s" % int(remote_chat_port.value)
+	return base_url + "#remote_chat_token=" + remote_chat_token.text.uri_encode()
 
 
 func _on_show_qr_pressed() -> void:
@@ -117,6 +128,19 @@ func _on_show_qr_pressed() -> void:
 		return
 	OS.shell_open(output_path)
 	remote_chat_status.text = tr("QR opened locally. It contains the access URL and token only.")
+
+
+func _on_restore_defaults_pressed() -> void:
+	restore_defaults_status.text = ""
+	%RestoreDefaultsDialog.popup_centered()
+
+
+func _on_restore_defaults_confirmed() -> void:
+	var restored := ProfileStore.restore_default_agents()
+	if restored.is_empty():
+		restore_defaults_status.text = tr("All default agents are already present.")
+		return
+	restore_defaults_status.text = tr("Restored %d default agent(s).") % restored.size()
 
 
 func _update_remote_chat_status() -> void:

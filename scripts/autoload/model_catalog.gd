@@ -18,6 +18,7 @@ func refresh() -> void:
 	_do_refresh(false)
 	loading = false
 	loaded_once = true
+	OpenCodeServer.mark_model_catalog_refreshed()
 	models_loaded.emit()
 
 
@@ -28,6 +29,7 @@ func refresh_with_network() -> void:
 	_do_refresh(true)
 	loading = false
 	loaded_once = true
+	OpenCodeServer.mark_model_catalog_refreshed()
 	models_loaded.emit()
 
 
@@ -37,6 +39,13 @@ func refresh_async() -> void:
 	loading = true
 	_thread = Thread.new()
 	_thread.start(_refresh_worker)
+
+
+func _exit_tree() -> void:
+	if _thread != null:
+		if _thread.is_started():
+			_thread.wait_to_finish()
+		_thread = null
 
 
 func _refresh_worker() -> void:
@@ -50,6 +59,7 @@ func _finish_async() -> void:
 		_thread = null
 	loading = false
 	loaded_once = true
+	OpenCodeServer.mark_model_catalog_refreshed()
 	models_loaded.emit()
 
 
