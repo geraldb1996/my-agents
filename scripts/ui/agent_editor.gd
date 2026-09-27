@@ -32,7 +32,7 @@ func _ready() -> void:
 	%AddSkillButton.pressed.connect(_on_add_skill_pressed)
 	%SaveButton.pressed.connect(_on_save_pressed)
 	%CancelButton.pressed.connect(_on_cancel_pressed)
-	%AgentRefreshButton.pressed.connect(_refresh_opencode_agents)
+	%AgentRefreshButton.pressed.connect(refresh_opencode_agents)
 	opencode_agent_select.item_selected.connect(_on_opencode_agent_selected)
 	%ProjectButton.pressed.connect(func(): project_dialog.popup_centered_ratio(0.5))
 	project_dialog.dir_selected.connect(_on_project_selected)
@@ -103,7 +103,7 @@ func _ensure_catalogs() -> void:
 		SkillCatalog.refresh_async(_project_path)
 
 
-func _refresh_opencode_agents() -> void:
+func refresh_opencode_agents() -> void:
 	_agent_request_id += 1
 	var request_id := _agent_request_id
 	_agent_selection_valid = false
@@ -475,7 +475,7 @@ func _on_project_path_submitted(text: String) -> void:
 func _update_project_label() -> void:
 	project_path_edit.text = _project_path
 	project_path_edit.tooltip_text = _project_path
-	_refresh_opencode_agents()
+	refresh_opencode_agents()
 
 
 func _on_save_pressed() -> void:

@@ -33,12 +33,12 @@ func refresh_with_network() -> void:
 	models_loaded.emit()
 
 
-func refresh_async() -> void:
+func refresh_async(network: bool = false) -> void:
 	if loading:
 		return
 	loading = true
 	_thread = Thread.new()
-	_thread.start(_refresh_worker)
+	_thread.start(_refresh_worker.bind(network))
 
 
 func _exit_tree() -> void:
@@ -48,8 +48,8 @@ func _exit_tree() -> void:
 		_thread = null
 
 
-func _refresh_worker() -> void:
-	_do_refresh(false)
+func _refresh_worker(network: bool) -> void:
+	_do_refresh(network)
 	call_deferred("_finish_async")
 
 
@@ -67,10 +67,10 @@ func _do_refresh(network: bool) -> void:
 	var args := ["models", "--refresh"] if network else ["models"]
 	var output: Array = []
 	var err := OS.execute("opencode", args, output, true, false)
-	models.clear()
 	if err != OK:
 		push_warning("opencode models failed with error %d" % err)
 		return
+	models.clear()
 	_collect_models(output)
 	_emit_progress(0.5)
 	_load_variants()

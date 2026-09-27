@@ -11,6 +11,7 @@ extends Control
 var _pending_catalogs: int = 0
 var _load_sources: Dictionary = {"models": 0.0, "skills": 0.0}
 var _load_target: float = 0.0
+var _refresh_pending: Array[String] = []
 
 
 func _ready() -> void:
@@ -18,8 +19,11 @@ func _ready() -> void:
 	agents_panel.edit_agent_requested.connect(_on_edit_agent)
 	agents_panel.duplicate_agent_requested.connect(_on_duplicate_agent)
 	agents_panel.delete_agent_requested.connect(_on_delete_agent)
+	agents_panel.refresh_data_requested.connect(_on_refresh_data_requested)
 	ModelCatalog.models_loaded.connect(_on_catalog_loaded)
 	SkillCatalog.skills_loaded.connect(_on_catalog_loaded)
+	ModelCatalog.models_loaded.connect(_on_refresh_catalog_loaded.bind("models"))
+	SkillCatalog.skills_loaded.connect(_on_refresh_catalog_loaded.bind("skills"))
 	ModelCatalog.load_progress.connect(_on_load_progress.bind("models"))
 	SkillCatalog.load_progress.connect(_on_load_progress.bind("skills"))
 	ThemeManager.theme_changed.connect(_apply_theme)
@@ -64,6 +68,8 @@ func _on_load_progress(value: float, source: String) -> void:
 
 
 func _on_catalog_loaded() -> void:
+	if _pending_catalogs <= 0:
+		return
 	_pending_catalogs -= 1
 	if _pending_catalogs > 0:
 		return
@@ -74,6 +80,29 @@ func _on_catalog_loaded() -> void:
 	loading_overlay.visible = false
 	agents_panel.refresh()
 	UpdateManager.check_for_updates()
+
+
+func _on_refresh_data_requested() -> void:
+	if not _refresh_pending.is_empty() or ModelCatalog.loading or SkillCatalog.loading:
+		return
+	_refresh_pending = ["models", "skills"]
+	agents_panel.set_data_refreshing(true)
+	ModelCatalog.refresh_async(true)
+	var project := ""
+	var profile := ProfileStore.get_profile(AgentManager.selected_agent_id)
+	if profile != null:
+		project = profile.project
+	SkillCatalog.refresh_async(project)
+	if editor.visible:
+		editor.refresh_opencode_agents()
+
+
+func _on_refresh_catalog_loaded(source: String) -> void:
+	if not _refresh_pending.has(source):
+		return
+	_refresh_pending.erase(source)
+	if _refresh_pending.is_empty():
+		agents_panel.set_data_refreshing(false)
 
 
 func _on_new_agent() -> void:

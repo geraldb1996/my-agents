@@ -5,6 +5,7 @@ signal new_agent_requested
 signal edit_agent_requested(agent_id: String)
 signal duplicate_agent_requested(agent_id: String)
 signal delete_agent_requested(agent_id: String)
+signal refresh_data_requested
 
 const STATE_LABELS := {
 	"idle": "Idle",
@@ -49,6 +50,7 @@ func _ready() -> void:
 	EventBus.session_renamed.connect(_on_session_renamed)
 	EventBus.session_titles_loaded.connect(_on_session_titles_loaded)
 	%NewButton.pressed.connect(_on_new_pressed)
+	%RefreshDataButton.pressed.connect(func() -> void: refresh_data_requested.emit())
 	%ContextMenu.id_pressed.connect(_on_context_menu_pressed)
 	%ModelMenu.id_pressed.connect(_on_model_menu_pressed)
 	%VariantMenu.id_pressed.connect(_on_variant_menu_pressed)
@@ -500,6 +502,11 @@ func _project_color(project: String) -> Color:
 
 func _on_new_pressed() -> void:
 	new_agent_requested.emit()
+
+
+func set_data_refreshing(refreshing: bool) -> void:
+	%RefreshDataButton.disabled = refreshing
+	%RefreshDataButton.text = "Refreshing data..." if refreshing else "Refresh data"
 
 
 func _on_profile_saved(_profile: AgentProfile) -> void:

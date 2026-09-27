@@ -338,6 +338,12 @@ msgstr "Modelo (proveedor/modelo)"
 msgid "Refresh"
 msgstr "Actualizar"
 
+msgid "Refresh data"
+msgstr "Actualizar datos"
+
+msgid "Refreshing data..."
+msgstr "Actualizando datos..."
+
 msgid "provider/model custom..."
 msgstr "proveedor/modelo personalizado..."
 

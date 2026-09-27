@@ -247,6 +247,7 @@ func _show_message_dialog(message_index: int) -> void:
 		button_bar.move_child(_message_dialog.get_ok_button(), 1)
 		button_bar.move_child(_next_message_button, 2)
 		_message_dialog.custom_action.connect(_on_message_dialog_action)
+		_message_dialog.window_input.connect(_on_message_dialog_input)
 		var layout := VBoxContainer.new()
 		_message_avatar = CharacterAvatar.new()
 		_message_avatar.custom_minimum_size = Vector2(160, 160)
@@ -294,6 +295,19 @@ func _on_message_dialog_action(action: StringName) -> void:
 	else:
 		return
 	_show_selected_message()
+
+
+func _on_message_dialog_input(event: InputEvent) -> void:
+	if not _message_dialog.visible or not event is InputEventKey or not event.pressed or event.echo:
+		return
+	match event.keycode:
+		KEY_LEFT:
+			_on_message_dialog_action(&"previous")
+		KEY_RIGHT:
+			_on_message_dialog_action(&"next")
+		_:
+			return
+	_message_dialog.set_input_as_handled()
 
 
 func _sync_dialog_avatar() -> void:

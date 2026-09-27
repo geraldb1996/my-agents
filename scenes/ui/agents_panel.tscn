@@ -44,6 +44,11 @@ layout_mode = 2
 text = "No agents yet.
 Create one with + New."
 
+[node name="RefreshDataButton" type="Button" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Refresh data"
+
 [node name="ContextMenu" type="PopupMenu" parent="." unique_id=1148466266]
 unique_name_in_owner = true
 oversampling_override = 1.0
