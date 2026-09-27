@@ -4,11 +4,13 @@ const PROFILES_DIR := "user://agents"
 const SESSIONS_DIR := "user://sessions"
 const CHAT_PATH := "user://chat.json"
 const PROJECT_COLORS_PATH := "user://project_colors.json"
+const AGENT_ORDER_PATH := "user://agent_order.json"
 const DEFAULT_AGENTS_DIR := "res://agents/default"
 
 var profiles: Dictionary = {}
 var chat_history: Array = []
 var project_colors: Dictionary = {}
+var agent_order: Array[String] = []
 var _chat_write_pending: bool = false
 
 
@@ -19,6 +21,7 @@ func _ready() -> void:
 	_seed_default_profiles()
 	load_chat_history()
 	load_project_colors()
+	load_agent_order()
 
 
 func _exit_tree() -> void:
@@ -102,6 +105,8 @@ func delete_profile(agent_id: String) -> void:
 	var path := PROFILES_DIR.path_join(agent_id + ".json")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	profiles.erase(agent_id)
+	agent_order.erase(agent_id)
+	save_agent_order(agent_order)
 
 
 func get_profile(agent_id: String) -> AgentProfile:
@@ -269,6 +274,57 @@ func _project_key(project: String) -> String:
 	while p.ends_with("/") or p.ends_with("\\"):
 		p = p.substr(0, p.length() - 1)
 	return p
+
+
+func load_agent_order() -> void:
+	agent_order.clear()
+	var text := _read_text(AGENT_ORDER_PATH)
+	if text.is_empty():
+		return
+	var parsed = JSON.parse_string(text)
+	if parsed is Array:
+		for agent_id in parsed:
+			if agent_id is String and not agent_order.has(agent_id):
+				agent_order.append(agent_id)
+
+
+func get_agent_group_key(agent_id: String) -> String:
+	var profile := get_profile(agent_id)
+	if profile == null:
+		return ""
+	return get_project_color(profile.project)
+
+
+func get_agent_order() -> Array[String]:
+	var ordered: Array[String] = []
+	for agent_id in agent_order:
+		if profiles.has(agent_id) and not ordered.has(agent_id):
+			ordered.append(agent_id)
+	for agent_id in profiles:
+		if not ordered.has(agent_id):
+			ordered.append(agent_id)
+	var grouped: Array[String] = []
+	for agent_id in ordered:
+		var key := get_agent_group_key(agent_id)
+		if key.is_empty():
+			grouped.append(agent_id)
+			continue
+		var insert_at := -1
+		for index in grouped.size():
+			if get_agent_group_key(grouped[index]) == key:
+				insert_at = index + 1
+		if insert_at < 0:
+			grouped.append(agent_id)
+		else:
+			grouped.insert(insert_at, agent_id)
+	return grouped
+
+
+func save_agent_order(order: Array[String]) -> Error:
+	var err := _write_text(AGENT_ORDER_PATH, JSON.stringify(order))
+	if err == OK:
+		agent_order = order.duplicate()
+	return err
 
 
 func load_session(agent_id: String) -> Dictionary:

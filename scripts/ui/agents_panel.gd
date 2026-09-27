@@ -33,6 +33,7 @@ const PROJECT_PALETTE: Array[Dictionary] = [
 	{"name": "Purple", "color": "8e4ec6"},
 	{"name": "Pink", "color": "d6409f"},
 ]
+const AGENT_CARD_SCRIPT := preload("res://scripts/ui/agent_card.gd")
 
 @onready var agent_list: VBoxContainer = %AgentList
 @onready var empty_label: Label = %EmptyLabel
@@ -73,7 +74,8 @@ func refresh() -> void:
 		card.queue_free()
 	_cards.clear()
 	empty_label.visible = ProfileStore.profiles.is_empty()
-	for profile in ProfileStore.profiles.values():
+	for agent_id in ProfileStore.get_agent_order():
+		var profile := ProfileStore.get_profile(agent_id)
 		var card := _build_card(profile)
 		agent_list.add_child(card)
 		_cards[profile.id] = card
@@ -91,7 +93,9 @@ func get_selected_id() -> String:
 
 
 func _build_card(profile: AgentProfile) -> Control:
-	var card := PanelContainer.new()
+	var card := AGENT_CARD_SCRIPT.new()
+	card.agent_id = profile.id
+	card.agents_panel = self
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.gui_input.connect(_on_card_input.bind(profile.id))
 	card.custom_minimum_size = Vector2(0, 72)
@@ -178,6 +182,39 @@ func _build_card(profile: AgentProfile) -> Control:
 	card.set_meta("session_label", session_label)
 	_update_card_state(profile.id, _get_state(profile.id))
 	return card
+
+
+func move_agent(source_id: String, target_id: String, after: bool) -> void:
+	if source_id == target_id or ProfileStore.get_profile(source_id) == null or ProfileStore.get_profile(target_id) == null:
+		return
+	var order := ProfileStore.get_agent_order()
+	var source_key := ProfileStore.get_agent_group_key(source_id)
+	var target_key := ProfileStore.get_agent_group_key(target_id)
+	var moving: Array[String] = []
+	if not source_key.is_empty() and source_key != target_key:
+		for agent_id in order:
+			if ProfileStore.get_agent_group_key(agent_id) == source_key:
+				moving.append(agent_id)
+	else:
+		moving.append(source_id)
+	for agent_id in moving:
+		order.erase(agent_id)
+	var index := order.find(target_id)
+	if index < 0:
+		return
+	if not target_key.is_empty() and source_key != target_key:
+		while index > 0 and ProfileStore.get_agent_group_key(order[index - 1]) == target_key:
+			index -= 1
+		if after:
+			while index < order.size() and ProfileStore.get_agent_group_key(order[index]) == target_key:
+				index += 1
+	elif after:
+		index += 1
+	for agent_id in moving:
+		order.insert(index, agent_id)
+		index += 1
+	if ProfileStore.save_agent_order(order) == OK:
+		refresh()
 
 
 func _card_name_text(profile: AgentProfile) -> String:
