@@ -982,18 +982,22 @@ func _emit_context_usage(agent_id: String, part: Dictionary) -> void:
 	var cache: Variant = tokens.get("cache", {})
 	if cache is not Dictionary:
 		cache = {}
-	var output_tokens := int(tokens.get("output", 0))
-	if output_tokens <= 0:
+	if tokens.is_empty() and not part.has("cost"):
 		return
-	var context_tokens := int(tokens.get("input", 0)) + output_tokens + int(tokens.get("reasoning", 0)) + int(cache.get("read", 0)) + int(cache.get("write", 0))
-	var profile := get_profile(agent_id)
-	var limit := 0
-	if profile != null:
-		limit = ModelCatalog.get_context_limit(profile.model)
-	var pct := 0.0
-	if limit > 0:
-		pct = minf(roundf(float(context_tokens) / float(limit) * 100.0), 100.0)
 	var session := get_session(agent_id)
+	var context_tokens := int(session.get("context_tokens", 0))
+	var pct := float(session.get("context_percent", 0.0))
+	if not tokens.is_empty():
+		context_tokens = int(tokens.get("input", 0)) + int(tokens.get("output", 0)) + int(tokens.get("reasoning", 0)) + int(cache.get("read", 0)) + int(cache.get("write", 0))
+		var limit := 0
+		var model: Variant = part.get("model", {})
+		if model is Dictionary and model.has("providerID") and model.has("id"):
+			limit = ModelCatalog.get_context_limit("%s/%s" % [str(model["providerID"]), str(model["id"])])
+		if limit <= 0:
+			var profile := get_profile(agent_id)
+			if profile != null:
+				limit = ModelCatalog.get_context_limit(profile.model)
+		pct = minf(roundf(float(context_tokens) / float(limit) * 100.0), 100.0) if limit > 0 else 0.0
 	session["cost_spent"] = float(session.get("cost_spent", 0.0)) + float(part.get("cost", 0.0))
 	session["context_tokens"] = context_tokens
 	session["context_percent"] = pct

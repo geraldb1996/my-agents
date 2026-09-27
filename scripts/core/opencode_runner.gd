@@ -271,7 +271,7 @@ func _handle_message(message: Dictionary) -> void:
 				var finish := str(message.get("finish", ""))
 				if finish == "stop":
 					_completed_ok = true
-				event_received.emit(agent_id, {"type": "step_finish", "part": {"reason": finish, "tokens": message.get("tokens", {}), "cost": message.get("cost", 0.0)}})
+				event_received.emit(agent_id, {"type": "step_finish", "part": {"reason": finish, "tokens": message.get("tokens", {}), "cost": message.get("cost", 0.0), "model": message.get("model", {})}})
 			_last_activity_ms = Time.get_ticks_msec()
 		"idle":
 			_message_ids[mid] = true
