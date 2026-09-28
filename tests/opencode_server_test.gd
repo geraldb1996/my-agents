@@ -14,7 +14,20 @@ func _on_ready(ok: bool) -> void:
 
 
 func _on_info(code: int, data: Variant) -> void:
-	var ok := code == 200 and data is Dictionary and not str(data.get("version", "")).is_empty()
-	print("[SERVERTEST] RESULT=", "PASS" if ok else "FAIL", " HTTP ", code)
-	OpenCodeServer.stop_server()
-	get_tree().quit(0 if ok else 1)
+	if code != 200 or not (data is Dictionary) or str(data.get("version", "")).is_empty():
+		print("[SERVERTEST] RESULT=FAIL HTTP ", code)
+		OpenCodeServer.stop_server()
+		get_tree().quit(1)
+		return
+	ModelCatalog.models_loaded.connect(_on_models_loaded, CONNECT_ONE_SHOT)
+	ModelCatalog.refresh_async()
+
+
+func _on_models_loaded() -> void:
+	var port := OpenCodeServer.port()
+	OpenCodeServer.ensure_ready(func(ready: bool) -> void:
+		var ok := ready and OpenCodeServer.port() == port and not ModelCatalog.models.is_empty() and not ModelCatalog.model_limits.is_empty()
+		print("[SERVERTEST] RESULT=", "PASS" if ok else "FAIL", " models=", ModelCatalog.models.size(), " limits=", ModelCatalog.model_limits.size(), " stable_port=", OpenCodeServer.port() == port)
+		OpenCodeServer.stop_server()
+		get_tree().quit(0 if ok else 1)
+	)

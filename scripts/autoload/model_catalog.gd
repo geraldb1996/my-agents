@@ -16,10 +16,7 @@ func refresh() -> void:
 		return
 	loading = true
 	_do_refresh(false)
-	loading = false
-	loaded_once = true
-	OpenCodeServer.mark_model_catalog_refreshed()
-	models_loaded.emit()
+	_finish_refresh()
 
 
 func refresh_with_network() -> void:
@@ -27,10 +24,7 @@ func refresh_with_network() -> void:
 		return
 	loading = true
 	_do_refresh(true)
-	loading = false
-	loaded_once = true
-	OpenCodeServer.mark_model_catalog_refreshed()
-	models_loaded.emit()
+	_finish_refresh()
 
 
 func refresh_async(network: bool = false) -> void:
@@ -57,9 +51,12 @@ func _finish_async() -> void:
 	if _thread != null:
 		_thread.wait_to_finish()
 		_thread = null
+	_finish_refresh()
+
+
+func _finish_refresh() -> void:
 	loading = false
 	loaded_once = true
-	OpenCodeServer.mark_model_catalog_refreshed()
 	models_loaded.emit()
 
 
@@ -73,7 +70,7 @@ func _do_refresh(_network: bool) -> void:
 	models.clear()
 	_collect_models(output)
 	_emit_progress(0.5)
-	_load_variants()
+	_load_model_details()
 	_emit_progress(1.0)
 
 
@@ -94,16 +91,21 @@ func get_context_limit(model_id: String) -> int:
 	return int(model_limits.get(model_id, 0))
 
 
-func _load_variants() -> void:
-	model_variants.clear()
-	model_limits.clear()
-	var output: Array = []
-	var err := OS.execute("opencode", ["api", "get", "/api/model"], output, true, false)
-	if err != OK:
-		return
-	var response = JSON.parse_string("".join(PackedStringArray(output)))
-	if response is Dictionary and response.get("data") is Array:
-		_collect_model_details(response["data"])
+func _load_model_details() -> void:
+	for _attempt in 2:
+		var output: Array = []
+		if OS.execute("opencode", ["api", "get", "/api/model"], output, true, false) != OK:
+			continue
+		var parser := JSON.new()
+		if parser.parse("".join(PackedStringArray(output))) != OK:
+			continue
+		var response: Variant = parser.data
+		if response is Dictionary and response.get("data") is Array and not response["data"].is_empty():
+			model_variants.clear()
+			model_limits.clear()
+			_collect_model_details(response["data"])
+			return
+	push_warning("Could not load OpenCode model details from the shared service")
 
 
 func _collect_model_details(entries: Array) -> void:

@@ -33,7 +33,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	editor.open_duplicate(source)
 	await get_tree().process_frame
-	editor._on_opencode_agents_loaded(200, [{"name": "build"}, {"name": "plan"}], editor._agent_request_id)
+	editor._on_opencode_agents_loaded(200, {"data": [{"name": "build"}, {"name": "plan"}]}, editor._agent_request_id)
 	var prefilled: bool = editor.name_edit.text == "DupeBot (copy)" \
 		and editor._editing_id.is_empty() \
 		and editor._get_selected_model() == source.model \
@@ -76,14 +76,14 @@ func _ready() -> void:
 	ProfileStore.delete_profile(source.id)
 	ProfileStore.delete_session(source.id)
 	editor._selected_opencode_agent = "missing-agent"
-	editor._on_opencode_agents_loaded(200, [{"name": "build"}], editor._agent_request_id)
+	editor._on_opencode_agents_loaded(200, {"data": [{"name": "build"}]}, editor._agent_request_id)
 	var missing_ok: bool = not editor._agent_selection_valid and editor.get_node("%SaveButton").disabled
 	editor.opencode_agent_select.select(0)
 	editor.opencode_agent_select.item_selected.emit(0)
 	var default_ok: bool = editor._agent_selection_valid and editor._selected_opencode_agent.is_empty()
 	editor._on_opencode_agents_loaded(0, null, editor._agent_request_id)
 	var failure_ok: bool = editor.opencode_agent_select.item_count == 1 and editor._agent_selection_valid
-	editor._on_opencode_agents_loaded(200, [{"name": "stale"}], editor._agent_request_id - 1)
+	editor._on_opencode_agents_loaded(200, {"data": [{"name": "stale"}]}, editor._agent_request_id - 1)
 	var stale_ok: bool = editor.opencode_agent_select.item_count == 1
 	print("[DUPETEST] missing_ok=", missing_ok, " default_ok=", default_ok, " failure_ok=", failure_ok, " stale_ok=", stale_ok)
 	var ok := signal_ok and prefilled and copy_ok and original_ok and missing_ok and default_ok and failure_ok and stale_ok

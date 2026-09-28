@@ -119,7 +119,7 @@ func _installed_version_worker() -> void:
 	var output: Array = []
 	var version := ""
 	if OS.execute("opencode", ["--version"], output, true, false) == OK:
-		version = "".join(PackedStringArray(output)).strip_edges()
+		version = "".join(PackedStringArray(output)).strip_edges().trim_prefix("opencode").strip_edges().trim_prefix("v")
 	call_deferred("_on_installed_version_probed", version)
 
 
